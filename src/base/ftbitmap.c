@@ -615,6 +615,8 @@
 
 #ifdef FT_BITMAP_MMI_CONVERT_ENABLED
           ft_bitmap_mmi_convert_mono_row( ss, tt, source->width );
+#elif defined( FT_BITMAP_VIS1_CONVERT_ENABLED )
+          ft_bitmap_vis1_convert_mono_row( ss, tt, source->width );
 #else
           FT_UInt  j;
 
@@ -653,7 +655,7 @@
             }
           }
 
-#endif /* FT_BITMAP_MMI_CONVERT_ENABLED */
+#endif /* packed MONO or GRAY2 conversion */
           s += source->pitch;
           t += target->pitch;
         }
@@ -696,6 +698,8 @@
 
 #ifdef FT_BITMAP_MMI_CONVERT_ENABLED
           ft_bitmap_mmi_convert_gray2_row( ss, tt, source->width );
+#elif defined( FT_BITMAP_VIS1_CONVERT_ENABLED )
+          ft_bitmap_vis1_convert_gray2_row( ss, tt, source->width );
 #else
           FT_UInt  j;
 
@@ -729,7 +733,7 @@
             }
           }
 
-#endif /* FT_BITMAP_MMI_CONVERT_ENABLED */
+#endif /* packed MONO or GRAY2 conversion */
           s += source->pitch;
           t += target->pitch;
         }
