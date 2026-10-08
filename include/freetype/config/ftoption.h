@@ -197,6 +197,25 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional R5900 MMI packed MONO/GRAY2/GRAY4 to 8-bit conversion.
+   * Uses small lookup tables for MONO/GRAY2, and PEXTLB/PSRLH/PSLLH
+   * for aligned GRAY4 blocks.  PS2 R5900 and GCC-compatible assembler
+   * required.  The option is disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_CONVERT */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC VIS1 FPMERGE packed GRAY4 to 8-bit conversion.
+   * Requires big-endian SPARC with VIS1 and a GCC-compatible assembler.
+   * The option is disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
