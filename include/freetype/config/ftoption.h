@@ -179,6 +179,24 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optionally use R5900 MMI 128-bit aligned stores for long gray spans
+   * in the smooth rasterizer.  Spans shorter than 64 bytes use existing
+   * scalar/memset processing; target-specific compilation is required.
+   */
+/* #define FT_CONFIG_OPTION_MMI_GRAY_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optionally use SPARC 64-bit aligned FP doubleword stores for long
+   * gray spans in the smooth rasterizer.  Requires VIS1-class SPARC
+   * hardware with FP support and a GCC-compatible toolchain.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_GRAY_SPANS */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
