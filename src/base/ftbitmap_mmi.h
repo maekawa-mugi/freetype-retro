@@ -53,14 +53,18 @@ ft_bitmap_mmi_gray8_embolden_one( FT_Byte*  p,
 
 
     __asm__ volatile (
+      ".set push\n\t"
+      ".set noreorder\n\t"
       "mtsab  $zero, 15\n\t"
       "lq     %0, 0(%2)\n\t"
       "lq     %1, 0(%3)\n\t"
       "nop\n\t"
       "qfsrv  %1, %0, %1\n\t"
       "paddub %0, %0, %1\n\t"
+      "nop\n\t"
       "sq     %0, 0(%2)\n\t"
-      "nop\n\t"  /* Keep MTSAB separated from the previous QFSRV. */
+      "nop\n\t"
+      ".set pop\n\t"
       : "=&r" ( current_value ), "=&r" ( previous_value )
       : "r" ( current ), "r" ( previous )
       : "memory" );
@@ -99,6 +103,7 @@ ft_bitmap_mmi_gray8_embolden_one( FT_Byte*  p,
     "lq     %0, 0(%3)\n\t"                                       \
     "lq     %1, 0(%4)\n\t"                                       \
     "por    %2, %0, $zero\n\t"                                  \
+    "nop\n\t"                                                   \
     "qfsrv  %1, %0, %1\n\t"                                     \
     "paddub %0, %0, %1\n\t"
 
@@ -226,7 +231,10 @@ ft_bitmap_mmi_or_row( FT_Byte*        dst,
       __asm__ volatile (
         "lq  %0, 0(%2)\n\t"
         "lq  %1, 0(%3)\n\t"
+        "nop\n\t"
+        "nop\n\t"
         "por %0, %0, %1\n\t"
+        "nop\n\t"
         "sq  %0, 0(%2)\n\t"
         : "=&r" ( d ), "=&r" ( s )
         : "r" ( dst + i ), "r" ( src + i )
