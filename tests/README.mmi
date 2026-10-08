@@ -22,3 +22,18 @@ The MMI/VIS1 kernels still require separate target compiler checks,
 pixel-identity tests against unoptimized FreeType, and hardware
 benchmarks.  Deferred target testing is described in
 docs/MMI_EMBOLDEN.md and docs/VIS1_EMBOLDEN.md.
+
+Packed conversion batch tests
+=============================
+
+The same host batch command also runs tests/convert_simd_model.c with
+197,376 MMI/VIS1 packed conversion cases.  No hardware-specific code
+is run by this model.
+
+To compare the actual FreeType conversion output after building scalar
+and SIMD library variants separately, build
+`tests/convert_freetype_compare.c` against each variant.  It computes a
+fingerprint for 16,560 deterministic cases; compare the entire lines.
+Only active pixels are hashed, not potentially uninitialized row padding.
+
+See docs/RETRO_BITMAP_CONVERT.md and docs/RETRO_SIMD_TEST_PLAN.md.
