@@ -26,10 +26,23 @@ reads past a scanline or writes outside its row. The fast path works with
 both positive and negative bitmap pitch because the caller chooses the row
 addresses before invoking these helpers.
 
+## Long grayscale spans (second independent switch)
+
+Define `FT_CONFIG_OPTION_MMI_GRAY_SPANS` to enable an aligned 128-bit
+`SQ` fill path in `src/smooth/ftgrays.c` for uniform grayscale runs
+at least 64 pixels long.  The code constructs a 16-byte repeated coverage
+pattern, handles unaligned edges in C, and writes aligned 16-byte blocks
+in an R5900 inline-assembly loop.  The usual short-span path stays as is.
+The threshold is provisional, subject to later profiling.
+
+The standalone `ftgrays.c` renderer ignores the optional feature.
+
 ## Validation
 
 Run the host-side equivalence model in `tests/mmi_embolden_equivalence.c`
 (via `tests/run_retro_simd_models.sh`), then compare
 `FT_Bitmap_Embolden` output on an EE against the default scalar build over
 varying positive/negative pitches, byte alignments, and pixel modes.
-Benchmark on actual hardware. No speedup is assumed by this patch.
+Also compare normal-mode glyph output with `tests/retro_glyph_hash.c`
+using identical font data.  Benchmark on actual hardware.  No speedup
+is assumed by this patch.
