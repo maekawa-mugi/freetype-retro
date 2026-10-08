@@ -62,6 +62,39 @@ static void sim_mmi_gray8_one(uint8_t *p, int pitch) {
   }
 }
 
+static void sim_mmi_gray8_small(uint8_t *p, int pitch, int strength) {
+  int x=pitch;
+  while (x>0 && (((uintptr_t)(p+x))&15)) {
+    unsigned total;
+    --x;
+    total=p[x];
+    for(int k=1;k<=strength && k<=x;++k) total+=p[x-k];
+    p[x]=(uint8_t)(total>255?255:total);
+  }
+  while (x>=32) {
+    uint8_t *cur=p+x-16,*prev=cur-16,original[16],before[16],result[16];
+    assert(!((uintptr_t)cur&15) && !((uintptr_t)prev&15));
+    memcpy(original,cur,16);
+    memcpy(before,prev,16);
+    for(int i=0;i<16;++i) {
+      unsigned total=original[i];
+      for(int k=1;k<=strength;++k)
+        total=sat8(total,i>=k?original[i-k]:before[16+i-k]);
+      result[i]=(uint8_t)total;
+    }
+    memcpy(cur,result,16);
+    ++total_vectors;
+    x-=16;
+  }
+  while (x>0) {
+    unsigned total;
+    --x;
+    total=p[x];
+    for(int k=1;k<=strength && k<=x;++k) total+=p[x-k];
+    p[x]=(uint8_t)(total>255?255:total);
+  }
+}
+
 static void reference_or(uint8_t* dst, const uint8_t* src, int pitch) {
   for(int i=0;i<pitch;++i) dst[i] |= src[i];
 }
@@ -77,35 +110,62 @@ static void sim_mmi_or(uint8_t* dst, const uint8_t* src, int pitch) {
   while(i<pitch) {dst[i]|=src[i];++i;}
 }
 
-static unsigned total_tests=0;
-static void compare(int pitch, int alignment, int ystr, int xstr, int numgrays) {
-  /* Use oversized row-stride and guard regions. */
-  const size_t nrows = 5 + ystr, total = 8192;
-  uint8_t *a=malloc(total), *b=malloc(total);
-  assert(a && b);
-  memset(a,0xA7,total);
-  memset(b,0xA7,total);
-  uint8_t *pa=a+128+alignment, *pb=b+128+alignment;
-  assert(pitch <= 512 && (size_t)(nrows*pitch) + 160 < total);
-  for(size_t i=0;i<nrows*(size_t)pitch;++i) pa[i]=pb[i]=(uint8_t)rnd();
-  for(int row=0;row<5;++row) {
-    uint8_t *r1=pa + (row+ystr)*pitch;
-    uint8_t *r2=pb + (row+ystr)*pitch;
-    reference_horizontal(r1,pitch,xstr,numgrays);
-    if (xstr==1 && numgrays==256) sim_mmi_gray8_one(r2,pitch);
-    else reference_horizontal(r2,pitch,xstr,numgrays);
-    for(int k=1;k<=ystr;++k) {
-      reference_or(r1-k*pitch,r1,pitch);
-      sim_mmi_or(r2-k*pitch,r2,pitch);
+static unsigned vis_vectors=0;
+static void sim_vis1_or(uint8_t *dst, const uint8_t *src, int pitch) {
+  int i=0;
+  if ((((uintptr_t)dst)&7)==(((uintptr_t)src)&7)) {
+    while(i<pitch && (((uintptr_t)(dst+i))&7)) {dst[i]|=src[i];++i;}
+    for(;pitch-i>=8;i+=8) {
+      for(int j=0;j<8;++j) dst[i+j]|=src[i+j];
+      ++vis_vectors;
     }
   }
-  if(memcmp(a,b,total)!=0) {
-    fprintf(stderr,"MISMATCH pitch=%d align=%d ystr=%d xstr=%d numgrays=%d\n",pitch,alignment,ystr,xstr,numgrays);
+  while(i<pitch) {dst[i]|=src[i];++i;}
+}
+
+static unsigned total_tests=0;
+static void compare(int pitch, int alignment, int ystr, int xstr, int numgrays, int negative) {
+  /* Layout matches the FreeType positive/negative pitch traversal order.
+   * Guard/padding bytes must be unchanged after each entire test case.
+   */
+  const size_t nrows = (size_t)5+ystr, total = 8192;
+  uint8_t *a=malloc(total), *b=malloc(total), *c=malloc(total);
+  assert(a && b && c);
+  memset(a,0xA7,total);
+  memset(b,0xA7,total);
+  memset(c,0xA7,total);
+  uint8_t *pa=a+128+alignment, *pb=b+128+alignment, *pc=c+128+alignment;
+  assert(pitch <= 512 && nrows*(size_t)pitch + 160 < total);
+  for(size_t i=0;i<nrows*(size_t)pitch;++i)
+    pa[i]=pb[i]=pc[i]=(uint8_t)rnd();
+  for(int row=0;row<5;++row) {
+    int row_index = negative ? 4-row : row+ystr;
+    int row_step = negative ? 1 : -1;
+    uint8_t *r1=pa+row_index*pitch;
+    uint8_t *r2=pb+row_index*pitch;
+    uint8_t *r3=pc+row_index*pitch;
+    reference_horizontal(r1,pitch,xstr,numgrays);
+    if(xstr>=1 && xstr<=4 && numgrays==256) {
+      if(xstr==1) sim_mmi_gray8_one(r2,pitch);
+      else sim_mmi_gray8_small(r2,pitch,xstr);
+    } else reference_horizontal(r2,pitch,xstr,numgrays);
+    reference_horizontal(r3,pitch,xstr,numgrays);
+    for(int k=1;k<=ystr;++k) {
+      int offset=row_step*k*pitch;
+      reference_or(r1+offset,r1,pitch);
+      sim_mmi_or(r2+offset,r2,pitch);
+      sim_vis1_or(r3+offset,r3,pitch);
+    }
+  }
+  if(memcmp(a,b,total)!=0 || memcmp(a,c,total)!=0) {
+    fprintf(stderr,"MISMATCH pitch=%d align=%d ystr=%d xstr=%d grays=%d negative=%d\n",
+      pitch,alignment,ystr,xstr,numgrays,negative);
     abort();
   }
-  free(a);free(b);
+  free(a);free(b);free(c);
   ++total_tests;
 }
+
 int main(void) {
   const int pitches[]={1,2,3,4,7,8,14,15,16,17,31,32,33,47,48,49,63,64,65,95,96,97,127,128,129,255,256,257,511,512};
   for(unsigned p=0;p<sizeof(pitches)/sizeof(pitches[0]);++p)
@@ -114,8 +174,10 @@ int main(void) {
         for(int xstr=0;xstr<=4;++xstr)
           for(int gray_sel=0;gray_sel<3;++gray_sel) {
             int ngray=gray_sel==0?256:gray_sel==1?16:2;
-            compare(pitches[p],alignment,ystr,xstr,ngray);
+            compare(pitches[p],alignment,ystr,xstr,ngray,0);
+            compare(pitches[p],alignment,ystr,xstr,ngray,1);
           }
-  printf("PASS: %u deterministic end-to-end cases; %u 128-bit vector chunks emulated\n",total_tests,total_vectors);
+  printf("PASS: %u cases, %u MMI 128-bit and %u VIS1 64-bit vector chunks emulated\n",
+         total_tests,total_vectors,vis_vectors);
   return 0;
 }
