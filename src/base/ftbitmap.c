@@ -34,6 +34,18 @@
 #include "ftbitmap_vis1.h"
 #endif
 
+#if defined( FT_CONFIG_OPTION_MMI_BITMAP_CONVERT ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_CONVERT_ENABLED
+#include "ftbitmap_convert_mmi.h"
+#endif
+
+#if defined( FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_VIS1_CONVERT_ENABLED
+#include "ftbitmap_convert_vis1.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -600,7 +612,11 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#ifdef FT_BITMAP_MMI_CONVERT_ENABLED
+          ft_bitmap_mmi_convert_mono_row( ss, tt, source->width );
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -637,6 +653,7 @@
             }
           }
 
+#endif /* FT_BITMAP_MMI_CONVERT_ENABLED */
           s += source->pitch;
           t += target->pitch;
         }
@@ -676,7 +693,11 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#ifdef FT_BITMAP_MMI_CONVERT_ENABLED
+          ft_bitmap_mmi_convert_gray2_row( ss, tt, source->width );
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -708,6 +729,7 @@
             }
           }
 
+#endif /* FT_BITMAP_MMI_CONVERT_ENABLED */
           s += source->pitch;
           t += target->pitch;
         }
@@ -726,7 +748,13 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#if defined( FT_BITMAP_MMI_CONVERT_ENABLED )
+          ft_bitmap_mmi_convert_gray4_row( ss, tt, source->width );
+#elif defined( FT_BITMAP_VIS1_CONVERT_ENABLED )
+          ft_bitmap_vis1_convert_gray4_row( ss, tt, source->width );
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -745,6 +773,7 @@
           if ( source->width & 1 )
             tt[0] = (FT_Byte)( ( ss[0] & 0xF0 ) >> 4 );
 
+#endif /* architecture-specific GRAY4 conversion */
           s += source->pitch;
           t += target->pitch;
         }
