@@ -384,11 +384,13 @@
        * `xstr' pixels before it.
        */
 #ifdef FT_BITMAP_MMI_ENABLED
-      /* One-pixel GRAY8 emboldening is exactly unsigned saturated add. */
-      if ( bitmap->pixel_mode == FT_PIXEL_MODE_GRAY &&
-           bitmap->num_grays == 256               &&
-           xstr == 1 )
-        ft_bitmap_mmi_gray8_embolden_one( p, pitch );
+      /* Each 8-bit 256-level pixel is a saturated sum of the original
+       * xstr+1 coverage bytes.  The R5900 path handles 1..4 pixels, including
+       * LCD horizontal pixel tripling; others retain the scalar path. */
+      if ( bitmap->pixel_mode != FT_PIXEL_MODE_MONO &&
+           bitmap->num_grays == 256                &&
+           xstr >= 1 && xstr <= 4 )
+        ft_bitmap_mmi_gray8_embolden_small( p, pitch, xstr );
       else
 #endif
       for ( x = pitch - 1; x >= 0; x-- )
