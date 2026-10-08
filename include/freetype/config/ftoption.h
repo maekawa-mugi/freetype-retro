@@ -169,6 +169,16 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Enable SPARC VIS1 acceleration of the vertical FT_Bitmap_Embolden
+   * bitmap OR pass.  This requires an SPARC target with VIS1 support
+   * (e.g. UltraSPARC) and a GCC-compatible assembler.  It is disabled
+   * by default and disabled by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_BITMAP_EMBOLDEN */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
