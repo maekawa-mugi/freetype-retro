@@ -1,18 +1,24 @@
-R5900 MMI embolden smoke test
-============================
+SIMD emboldening model and deferred hardware checks
+=================================================
 
-Build and run this host-side deterministic *emulation* test:
+Host-side model test:
+
+    sh tests/run_retro_simd_models.sh
+
+Or compile the deterministic model manually:
 
     cc -O2 -Wall -Wextra -fsanitize=address,undefined \
        tests/mmi_embolden_equivalence.c -o mmi-embolden-test
     ./mmi-embolden-test
 
-It models QFSRV (SA=120), unsigned saturating PADDUB, and POR at the
-byte level and compares the horizontal and vertical processing order
-with the original scalar loops.  It covers 36,000 cases, including
-all 16 byte offsets, short/long rows, and scalar fallbacks.
+It models byte-level QFSRV neighbour extraction, saturated PADDUB, MMI
+POR (16 bytes), and VIS1 FOR (8 bytes).  It now covers 72,000
+combinations including both pitch directions, all 16 byte alignments,
+short and long rows, 0..4 horizontal strength, and multiple grayscale
+limits.  It also checks the untouched guard and padding bytes.
 
-IMPORTANT: This test does NOT execute MMI instructions.  Build the library
-with an actual R5900 toolchain and validate pixel-perfect rendering on EE
-hardware or a suitable emulator before claiming machine-code correctness
-or a performance improvement.
+IMPORTANT: The host model cannot execute R5900 or VIS1 machine code.
+The MMI/VIS1 kernels still require separate target compiler checks,
+pixel-identity tests against unoptimized FreeType, and hardware
+benchmarks.  Deferred target testing is described in
+docs/MMI_EMBOLDEN.md and docs/VIS1_EMBOLDEN.md.
