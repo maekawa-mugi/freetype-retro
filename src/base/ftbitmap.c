@@ -28,6 +28,12 @@
 #include "ftbitmap_mmi.h"
 #endif
 
+#if defined( FT_CONFIG_OPTION_VIS1_BITMAP_EMBOLDEN ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_VIS1_ENABLED
+#include "ftbitmap_vis1.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -439,8 +445,10 @@
 
 
         q = p - bitmap->pitch * x;
-#ifdef FT_BITMAP_MMI_ENABLED
+#if defined( FT_BITMAP_MMI_ENABLED )
         ft_bitmap_mmi_or_row( q, p, pitch );
+#elif defined( FT_BITMAP_VIS1_ENABLED )
+        ft_bitmap_vis1_or_row( q, p, pitch );
 #else
         for ( i = 0; i < pitch; i++ )
           q[i] |= p[i];
