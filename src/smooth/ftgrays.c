@@ -303,6 +303,18 @@ typedef ptrdiff_t  FT_PtrDist;
 #define FT_ZERO( p )  FT_MEM_ZERO( p, sizeof ( *(p) ) )
 #endif
 
+/* Optional target-specific filling is confined to the non-standalone
+ * renderer.  Standalone ftgrays.c must remain buildable by itself. */
+#if !defined( STANDALONE_ ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER ) && \
+    ( defined( FT_CONFIG_OPTION_MMI_GRAY_SPANS ) || \
+      defined( FT_CONFIG_OPTION_VIS1_GRAY_SPANS ) )
+#include "ftgrays_retro.h"
+#define FT_GRAY_BULK_SET( d, s, n )  ft_gray_retro_fill( d, s, n )
+#else
+#define FT_GRAY_BULK_SET( d, s, n )  FT_MEM_SET( d, s, n )
+#endif
+
   /* as usual, for the speed hungry :-) */
 
 #undef RAS_ARG
@@ -430,7 +442,7 @@ typedef ptrdiff_t  FT_PtrDist;
       case 2: *q++ = (unsigned char)s; FALL_THROUGH; \
       case 1: *q   = (unsigned char)s; FALL_THROUGH; \
       case 0: break;                                 \
-      default: FT_MEM_SET( d, s, count );            \
+      default: FT_GRAY_BULK_SET( q, s, count );      \
     }                                                \
   FT_END_STMNT
 
