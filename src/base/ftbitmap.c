@@ -22,6 +22,12 @@
 #include <freetype/ftimage.h>
 #include <freetype/internal/ftobjs.h>
 
+#if defined( FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_ENABLED
+#include "ftbitmap_mmi.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -371,6 +377,14 @@
        * From the last pixel on, make each pixel or'ed with the
        * `xstr' pixels before it.
        */
+#ifdef FT_BITMAP_MMI_ENABLED
+      /* One-pixel GRAY8 emboldening is exactly unsigned saturated add. */
+      if ( bitmap->pixel_mode == FT_PIXEL_MODE_GRAY &&
+           bitmap->num_grays == 256               &&
+           xstr == 1 )
+        ft_bitmap_mmi_gray8_embolden_one( p, pitch );
+      else
+#endif
       for ( x = pitch - 1; x >= 0; x-- )
       {
         unsigned char  tmp;
@@ -425,8 +439,12 @@
 
 
         q = p - bitmap->pitch * x;
+#ifdef FT_BITMAP_MMI_ENABLED
+        ft_bitmap_mmi_or_row( q, p, pitch );
+#else
         for ( i = 0; i < pitch; i++ )
           q[i] |= p[i];
+#endif
       }
 
       p += bitmap->pitch;
