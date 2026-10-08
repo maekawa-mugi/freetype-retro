@@ -158,6 +158,17 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Enable the PlayStation 2 Emotion Engine (R5900) MMI implementation of
+   * selected FT_Bitmap_Embolden loops.  This is an opt-in implementation:
+   * it requires a GCC-compatible toolchain with R5900 MMI assembly support.
+   * Other architectures must not enable it.  The option is ignored if
+   * FT_CONFIG_OPTION_NO_ASSEMBLER is defined.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
