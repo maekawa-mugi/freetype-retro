@@ -10,6 +10,8 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_MMI_GRAY_SPANS` | PS2 R5900 | 16-byte aligned stores for grayscale spans >=64px |
 | `FT_CONFIG_OPTION_VIS1_BITMAP_EMBOLDEN` | SPARC VIS1 | 8-byte aligned vertical OR |
 | `FT_CONFIG_OPTION_VIS1_GRAY_SPANS` | SPARC VIS1 | 8-byte aligned stores for grayscale spans >=64px |
+| `FT_CONFIG_OPTION_MMI_BITMAP_CONVERT` | PS2 R5900 | MONO/GRAY2/GRAY4 16-pixel conversion |
+| `FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT` | SPARC VIS1 | MONO/GRAY2/GRAY4 8-pixel conversion with FPMERGE |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables these paths.  A standalone
 `ftgrays.c` build remains scalar.  The 64-byte span threshold is an
@@ -20,6 +22,9 @@ unmeasured heuristic.
 From the repository root:
 
     sh tests/run_retro_simd_models.sh
+
+The command also runs `tests/convert_simd_model.c` for 197,376
+packed conversion format, width and address-alignment combinations.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -45,6 +50,16 @@ and 0/1/3 vertically, plus both signs of pitch.
 These checks also cover cases where a bitmap has a wider pitch than its
 pixel width.  The program hashes all allocated bitmap bytes and logical
 metadata, not just the first pixel of a row.
+
+### Packed bitmap conversion output
+
+Compile `tests/convert_freetype_compare.c` against each library variant
+and compare the output fingerprints. This additional test covers 16,560
+cases across MONO, GRAY2, GRAY4, all tested alignments, both pitch signs,
+and odd widths. **The test hashes only active output pixels** because
+FT_Bitmap_Convert does not initialize destination row padding.
+
+See `docs/RETRO_BITMAP_CONVERT.md` for details and memory costs.
 
 ## Tier C: end-to-end glyph rendering
 
