@@ -20,6 +20,8 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_MONO_SPANS` | Both (portable C) | Long MONO interior bytes via memset, preserving masked edges |
 | `FT_CONFIG_OPTION_MMI_MONO_SPANS` | PS2 R5900 | 128-bit aligned SQ stores for full long MONO span interiors |
 | `FT_CONFIG_OPTION_VIS1_MONO_SPANS` | SPARC VIS1 | 64-bit aligned doubleword stores for full long MONO span interiors |
+| `FT_CONFIG_OPTION_RETRO_MULFIX_R5900` | PS2 R5900 32-bit ABI | Signed MULT and HI/LO with exact FreeType fixed-point rounding |
+| `FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32` | SPARC 32-bit ABI | SMUL, RD %y and exact FreeType fixed-point rounding |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -42,9 +44,14 @@ LCD five-tap folded implementation in 165,120 length/offset/weight/coverage
 and positive/negative-pitch cases, including overlapping spans.
 
 The command additionally compiles `tests/overlap_mono_model.c`, containing
-17,408 exhaustive overlap-carry identities, 33,408 full overlap-span
+17,408 repeated-correction equivalence cases, 33,408 full overlap-span
 comparisons, and 82,176 MONO interior/edge-byte comparisons.  The
 native MMI/VIS1 instruction stores are not run by this host model.
+
+The host runner also executes `tests/mulfix_rounding_model.c`, with
+1,037,663 boundary, signed-tie and pseudorandom operand pairs.  This
+uses the actual shared HI/LO rounding helper, not target multiplication
+instructions.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -101,6 +108,17 @@ enabled (it is disabled by default). Compare `lcd` and `lcd-v` output
 from `tests/retro_glyph_hash.c` against the unchanged renderer. See
 `docs/RETRO_LCD_SPANS.md`. Check `PADDB` instruction emission only
 if the R5900 MMI option is selected; do not use saturating `PADDUB`.
+
+### Fixed-point FT_MulFix arithmetic
+
+Compare `tests/mulfix_freetype_compare.c` public API fingerprints
+between scalar and ISA-specific builds, for 775,517 cases including
+negative halfway ties, signed extremes and random values.  Both
+FreeType variants must have the **same 32-bit ABI**.  The options
+also affect inlined internal calls, so check Tier C glyph fingerprints.
+Consult `docs/RETRO_MULFIX.md` for instruction hazard, ABI and test
+requirements.  The R5900 and SPARC32 implementations are mutually
+exclusive and disabled by `FT_CONFIG_OPTION_NO_ASSEMBLER`.
 
 ## Tier C: end-to-end glyph rendering
 
