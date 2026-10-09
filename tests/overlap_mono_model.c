@@ -129,8 +129,10 @@ main(void)
 {
   unsigned pixel, cover, count, iteration, length, x, pad;
 
-  /* The grouping identity must hold for EVERY destination byte and
-   * 1..4 repeated contributions of EVERY rounded coverage 0..16. */
+  /* The grouped read/write helper must preserve the original
+   * per-sample correction for EVERY destination byte and all rounded
+   * coverage values 0..16.  Grouped cover*count is NOT equivalent:
+   * two cover=1 additions to byte=255 stay at 255, not 0. */
   for(pixel=0;pixel<256;++pixel)
     for(cover=0;cover<=16;++cover)
       for(count=1;count<=4;++count) {
@@ -140,7 +142,7 @@ main(void)
           unsigned s=actual+cover;
           actual=(FT_Byte)(s-(s>>8));
         }
-        expected=ft_smooth_retro_overlap_add((FT_Byte)pixel,cover*count);
+        expected=ft_smooth_retro_overlap_repeat((FT_Byte)pixel,cover,count);
         if(actual!=expected) {
           fprintf(stderr,"FAIL grouped coverage pixel=%u cover=%u count=%u\n",
                   pixel,cover,count);
