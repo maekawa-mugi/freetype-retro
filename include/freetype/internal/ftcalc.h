@@ -453,6 +453,28 @@ FT_BEGIN_HEADER
 #endif /* !FT_CONFIG_OPTION_NO_ASSEMBLER */
 
 
+/* Optional EE PLZCW or SPARC32 De Bruijn alternative to the generic
+ * GCC __builtin_clz.  They are opt-in because many toolchains already
+ * provide an optimal builtin implementation for their selected ISA.
+ */
+#if defined( FT_CONFIG_OPTION_RETRO_MSB_R5900 ) && \
+    defined( FT_CONFIG_OPTION_RETRO_MSB_SPARC32 )
+#error "Select only one retro FT_MSB backend"
+#endif
+
+#if !defined( FT_CONFIG_OPTION_NO_ASSEMBLER ) && \
+    ( defined( FT_CONFIG_OPTION_RETRO_MSB_R5900 ) || \
+      defined( FT_CONFIG_OPTION_RETRO_MSB_SPARC32 ) )
+#include "ftmsb_retro.h"
+
+#ifdef FT_MSB
+#undef FT_MSB
+#endif
+#define FT_MSB( x )  FT_RETRO_MSB_FUNC( (FT_UInt32)(x) )
+
+#endif /* optional retro FT_MSB */
+
+
 #ifndef FT_MSB
 
   FT_BASE( FT_Int )
