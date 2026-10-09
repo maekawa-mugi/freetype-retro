@@ -105,6 +105,43 @@ On non-target host builds, there is no fabricated SIMD result:
 actual MMI/VIS1 hardware instruction benchmark; only
 `target_hilo` is.
 
+## PS2 video output and persistent final result screen
+
+The PS2 benchmark is a **GS framebuffer application**, not just a
+stdout console test. It includes PS2SDK `<debug.h>`, calls
+`init_scr()` before verification, prints progress with
+`scr_setXY()` / `scr_printf()`, and links `-ldebug`.
+The display is initialized immediately when the ELF starts.
+
+During the run, the display shows `VERIFY X/N` and `BENCH X/N`
+with the current case name. On success the screen is reset into a
+results board containing **18 kernel families** with a representative
+(usually largest normal input-size) winning variant and
+**provisional** scalar-relative speedup. The values are computed
+from six median timing samples **after measurement**, never in the
+timed loop. For deployed baselines, MSB uses GCC builtin and long
+GRAY spans use libc memset, not an intentionally slow control.
+
+- **Success:** the board says `RESULT: PASS`.
+- **Correctness mismatch, timer failure, ABI error:** the screen
+  says `RESULT: FAIL` with the failing phase and case.
+- **Either outcome:** the EE calls PS2SDK `SleepThread()` to
+  keep the image on screen until the emulator/console is stopped;
+  the ELF deliberately does not exit normally.
+- **Full objective verdict:** capture stdout `RB1` records and use
+  `verdict.py`. The on-screen 1.05x threshold is a preview only,
+  not the final CI/noise-based recommendation. Cold-LUT and per-size
+  evidence appear in the full host report, not every screen row.
+
+To update an existing checkout and **build the modified ELF**:
+
+```sh
+cd ~/freetype-retro
+git pull --ff-only
+bash tests/retro_bench/build-ps2.sh
+# load build-retro-bench/retro-bench-ps2.elf in PCSX2 or on the EE
+```
+
 ## Commands (for LATER batch testing)
 
 Build-only host, with output path override:
