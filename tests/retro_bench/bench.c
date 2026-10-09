@@ -41,7 +41,8 @@ static FT_Retro_Mono_Embolden_Table mono_table;
 static volatile FT_UInt32 escape_sink;
 
 enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,BLEND,BLEND_COLD,
-       BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR };
+       BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
+       PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8 };
 struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
 static const struct rb_case cases[] = {
   {"msb-1024",MSB,1024,48},
@@ -75,7 +76,23 @@ static const struct rb_case cases[] = {
   {"grayfill-4096",GRAYFILL,4096,16},
   {"bitmap-or-16",ROW_OR,16,400},
   {"bitmap-or-512",ROW_OR,512,100},
-  {"bitmap-or-4096",ROW_OR,4096,16}
+  {"bitmap-or-4096",ROW_OR,4096,16},
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+  {"pack-mono-64",PACK_MONO,64,220},
+  {"pack-mono-512",PACK_MONO,512,70},
+  {"pack-mono-4096",PACK_MONO,4096,12},
+  {"pack-gray2-64",PACK_GRAY2,64,220},
+  {"pack-gray2-512",PACK_GRAY2,512,70},
+  {"pack-gray2-4096",PACK_GRAY2,4096,12},
+  {"pack-gray4-64",PACK_GRAY4,64,220},
+  {"pack-gray4-512",PACK_GRAY4,512,70},
+  {"pack-gray4-4096",PACK_GRAY4,4096,12},
+#endif
+#if defined(RETRO_BENCH_R5900)
+  {"embolden-gray8-64",EMBOLDEN_GRAY8,64,180},
+  {"embolden-gray8-512",EMBOLDEN_GRAY8,512,80},
+  {"embolden-gray8-4096",EMBOLDEN_GRAY8,4096,16},
+#endif
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
 
@@ -152,6 +169,15 @@ static const char* label(int kind,unsigned v)
     if(v==0)return "scalar";if(v==1)return "portable_loop";
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
     if(v==2)return "target_or";
+#endif
+    break;
+  case PACK_MONO:case PACK_GRAY2:case PACK_GRAY4:
+  case EMBOLDEN_GRAY8:
+    if(v==0)return "scalar";
+#if defined(RETRO_BENCH_R5900)
+    if(v==1)return "mmi";
+#elif defined(RETRO_BENCH_SPARC32)
+    if(v==1)return "vis1";
 #endif
     break;
   }
@@ -395,6 +421,46 @@ static void kernel(const struct rb_case* t,unsigned v)
     else ft_bitmap_mmi_or_row(output+16,input+16,(FT_Int)n);
 #elif defined(RETRO_BENCH_SPARC32)
     else ft_bitmap_vis1_or_row(output+16,input+16,(FT_Int)n);
+#endif
+    break;
+  case PACK_MONO:
+    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
+      (input[16+(i>>3)]>>(7-(i&7U)))&1U);
+#if defined(RETRO_BENCH_R5900)
+    else ft_bitmap_mmi_convert_mono_row(input+16,output+16,n);
+#elif defined(RETRO_BENCH_SPARC32)
+    else ft_bitmap_vis1_convert_mono_row(input+16,output+16,n);
+#endif
+    break;
+  case PACK_GRAY2:
+    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
+      (input[16+(i>>2)]>>(6-2*(i&3U)))&3U);
+#if defined(RETRO_BENCH_R5900)
+    else ft_bitmap_mmi_convert_gray2_row(input+16,output+16,n);
+#elif defined(RETRO_BENCH_SPARC32)
+    else ft_bitmap_vis1_convert_gray2_row(input+16,output+16,n);
+#endif
+    break;
+  case PACK_GRAY4:
+    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
+      (input[16+(i>>1)]>>(4-4*(i&1U)))&15U);
+#if defined(RETRO_BENCH_R5900)
+    else ft_bitmap_mmi_convert_gray4_row(input+16,output+16,n);
+#elif defined(RETRO_BENCH_SPARC32)
+    else ft_bitmap_vis1_convert_gray4_row(input+16,output+16,n);
+#endif
+    break;
+  case EMBOLDEN_GRAY8:
+    if(v==0){
+      int x;
+      for(x=(int)n-1;x>=0;x--){
+        unsigned sum=output[16+x];
+        if(x)sum+=output[16+x-1];
+        output[16+x]=(FT_Byte)(sum>255U?255U:sum);
+      }
+    }
+#if defined(RETRO_BENCH_R5900)
+    else ft_bitmap_mmi_gray8_embolden_one(output+16,(FT_Int)n);
 #endif
     break;
   default:break;
