@@ -135,3 +135,28 @@ FT_CONFIG_OPTION_RETRO_MSB_SPARC32 uses portable De Bruijn arithmetic.
 Neither switch is enabled by default.  Do not select both at once.
 
 See docs/RETRO_MSB.md for ISA semantics, limits and target checks.
+
+32-bit fixed-point division and vector normalization
+====================================================
+
+Enable FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32 to select an exact
+portable C shortcut for FT_DivFix when the divisor is a power of
+two or the biased numerator fits in unsigned 32 bits.
+The shortcut falls back to the original function for zero divisor,
+oversized quotient and other conditions where the old behavior
+could differ between FT_INT64 and emulated-64-bit builds.
+
+Host batch: tests/divfix_fast32_model.c checks 1,961,233 operand
+pairs, using the actual fast-path helper and a 64-bit reference.
+
+Compare separate scalar vs optimized 32-bit FreeType builds with:
+
+  tests/divfix_freetype_compare.c       (993,225 public API cases)
+  tests/normlen_freetype_compare.c      (300,961 internal cases)
+
+The NormLen comparison needs STATIC linking against a matching
+FreeType archive and internal headers. Its arithmetic was not
+rewritten; this ensures FT_MSB backend changes do not alter the
+Newton iteration output or the reported normalized length.
+
+See docs/RETRO_DIVFIX_NORMLEN.md for configurations and caveats.
