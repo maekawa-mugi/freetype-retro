@@ -26,6 +26,31 @@ The FreeType C harness lives here:
 - `capture-and-judge.sh`: optional native-run wrapper, ONLY invoke
   it when ready to execute the tests.
 
+## Complete-log protocol and fail-closed decisions
+
+New EE/SPARC/host ELFs emit a **CASE manifest** immediately after the
+RB1,META line, before validation starts:
+
+    RB1,CASE,<suite>,<repetitions>,<input-size>,<scalar>,<candidate-A>[,...]
+
+The analyzer requires exactly the declared case names and variants, five
+CHECK records and six uniquely indexed SAMPLE records per variant.
+Every SAMPLE must have the case's declared repetition count and the
+META timer frequency. GATE and DONE must each occur once, in order,
+with a suite count exactly equal to the CASE manifest. A missing
+suite, a missing variant, duplicate or out-of-order records, malformed
+counts, or a truncated console capture **blocks every SELECT**.
+
+**Important:** logs captured from *older benchmark ELFs* lack CASE
+records and are now deliberately rejected rather than being
+mistaken for complete runs. Rebuild the ELF from the updated branch
+before collecting measurements. This is an RB1 format extension,
+not an attempt to reinterpret previous timing results.
+
+KEEP BUILTIN, KEEP MEMSET and KEEP SCALAR are always chosen from
+each workload's own deployed baseline; the decision must never
+reuse the preceding workload's reference.
+
 ## Objective: choose a correct kernel, not an impressive number
 
 For each suite and input size:
