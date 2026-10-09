@@ -551,12 +551,53 @@
 
     vec = outline->points;
 
+#ifdef FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM
+    /* Translating by zero is the identity.  For a one-axis shift
+     * avoid the unused addition and memory write on every point. */
+    if ( !xOffset && !yOffset )
+      return;
+
+    if ( !xOffset )
+    {
+      for ( n = 0; n < outline->n_points; n++, vec++ )
+        vec->y = ADD_LONG( vec->y, yOffset );
+
+      return;
+    }
+
+    if ( !yOffset )
+    {
+      for ( n = 0; n < outline->n_points; n++, vec++ )
+        vec->x = ADD_LONG( vec->x, xOffset );
+
+      return;
+    }
+
+    /* A pair of FT_Vector structures contains four FT_Pos values.
+     * Keep original unsigned-wrap ADD_LONG semantics for all of them.
+     * No alignment or additional instruction set is required. */
+    n = 0;
+    for ( ; n + 1 < outline->n_points; n += 2, vec += 2 )
+    {
+      vec[0].x = ADD_LONG( vec[0].x, xOffset );
+      vec[0].y = ADD_LONG( vec[0].y, yOffset );
+      vec[1].x = ADD_LONG( vec[1].x, xOffset );
+      vec[1].y = ADD_LONG( vec[1].y, yOffset );
+    }
+
+    if ( n < outline->n_points )
+    {
+      vec->x = ADD_LONG( vec->x, xOffset );
+      vec->y = ADD_LONG( vec->y, yOffset );
+    }
+#else
     for ( n = 0; n < outline->n_points; n++ )
     {
       vec->x = ADD_LONG( vec->x, xOffset );
       vec->y = ADD_LONG( vec->y, yOffset );
       vec++;
     }
+#endif
   }
 
 
@@ -754,8 +795,52 @@
     vec   = outline->points;
     limit = vec + outline->n_points;
 
+#ifdef FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM
+    /* Identity matrices are common in font loading.  Calling
+     * FT_MulFix four times per point produces precisely the existing
+     * coordinates, so the entire walk can be skipped. */
+    if ( matrix->xx == 0x10000L && matrix->xy == 0 &&
+         matrix->yx == 0         && matrix->yy == 0x10000L )
+      return;
+
+    /* The diagonal case needs only two FT_MulFix calls per point.
+     * The removed cross terms multiply by zero and are exactly zero
+     * even for signed extreme point coordinates. */
+    if ( matrix->xy == 0 && matrix->yx == 0 )
+    {
+      for ( ; vec < limit; vec++ )
+      {
+        vec->x = FT_MulFix( vec->x, matrix->xx );
+        vec->y = FT_MulFix( vec->y, matrix->yy );
+      }
+    }
+    else
+    {
+      /* Inlining avoids a per-point call and redundant null-pointer
+       * checks for arbitrary matrices, while retaining the original
+       * four FT_MulFix operations and evaluation order.  Coefficients
+       * are read per point rather than cached, preserving potential
+       * aliasing with the outline's vector storage. */
+      for ( ; vec < limit; vec++ )
+      {
+        FT_Pos  x = vec->x;
+        FT_Pos  y = vec->y;
+        FT_Pos  xz, yz;
+
+
+        xz = FT_MulFix( x, matrix->xx ) +
+             FT_MulFix( y, matrix->xy );
+        yz = FT_MulFix( x, matrix->yx ) +
+             FT_MulFix( y, matrix->yy );
+
+        vec->x = xz;
+        vec->y = yz;
+      }
+    }
+#else
     for ( ; vec < limit; vec++ )
       FT_Vector_Transform( vec, matrix );
+#endif
   }
 
 
