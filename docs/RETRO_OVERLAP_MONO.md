@@ -13,8 +13,10 @@ The original callback loops over each of four horizontal subpixels
 per destination pixel.  Each sample of a raster span has the same
 coverage.  The new helper handles the first partial group (0..3
 samples), all complete groups of four, and the final partial group.
-It updates each destination byte **once per group**, rather than
-performing a division/index computation for every sample.
+It **loads/stores each destination byte once per group** instead of
+once per sample, and reuses its precomputed destination pixel index.
+Importantly, the original per-sample arithmetic is repeated in
+a register for each contribution.
 
 The original correction is:
 
@@ -25,11 +27,13 @@ This is NOT a generally saturating addition.  For example,
 `old_pixel=255`, `cover=16` gives `(255+16-1) & 255 = 14`.
 An unrestricted `PADDUB` would instead produce 255.
 
-For up to four equal increments of 0..16, this expression crosses
-the 256 boundary at most once.  Therefore applying it to the
-combined sum is **byte-identical** to executing all per-sample
-increments.  The complete destination byte range is unchanged, as
-are span casting, pitch handling, and overlap accumulation order.
+Repeated applications are **not** equivalent to a single application
+with `cover * count`.  For example, `255 + 1` corrects back to 255
+every time, while one addition of 2 produces 0.  The new helper
+therefore loops over the original correction for each sample, keeping
+the intermediate 8-bit store semantics in a register, and writes the
+final pixel once.  The output byte range, span casting, pitch handling
+and overlap update order are unchanged.
 
 The grouping is portable C and potentially useful on both EE and
 SPARC VIS1 even if a SIMD kernel is not selected.  No SIMD
@@ -71,7 +75,7 @@ The batch includes `tests/overlap_mono_model.c`, which uses the actual
 overlap and portable MONO fill helpers and compares them against
 the source algorithm, including unchanged guard bytes:
 
-* 17,408 exhaustive destination/carry cases: all 256 byte values,
+* 17,408 exhaustive repeated-correction cases: all 256 byte values,
   cover values 0..16, and 1..4 equal subpixel contributions.
 * 33,408 full overlap-span cases with different alignment, positions,
   lengths, and a second overlapping raster span.
