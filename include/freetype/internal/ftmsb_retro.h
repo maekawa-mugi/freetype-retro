@@ -71,9 +71,10 @@ ft_msb_retro_r5900( FT_UInt32  value )
 
 #elif defined( FT_CONFIG_OPTION_RETRO_MSB_SPARC32 )
 
-#if !defined( __sparc__ ) || !defined( __GNUC__ ) || \
-    defined( __arch64__ ) || \
-    ( defined( __sparc_v9__ ) && defined( __LP64__ ) )
+#if !defined( FT_RETRO_MSB_MODEL_ONLY ) && \
+    ( !defined( __sparc__ ) || !defined( __GNUC__ ) || \
+      defined( __arch64__ ) || \
+      ( defined( __sparc_v9__ ) && defined( __LP64__ ) ) )
 #error "SPARC FT_MSB requires a 32-bit GCC-compatible SPARC ABI"
 #endif
 
