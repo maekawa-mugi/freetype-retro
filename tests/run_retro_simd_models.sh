@@ -9,3 +9,5 @@ trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 "$test_dir/retro-simd-model"
 "$CC" $CFLAGS tests/convert_simd_model.c -o "$test_dir/retro-convert-model"
 "$test_dir/retro-convert-model"
+"$CC" $CFLAGS tests/blend_exact255_model.c -o "$test_dir/retro-blend-model"
+"$test_dir/retro-blend-model"
