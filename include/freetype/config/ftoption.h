@@ -369,6 +369,22 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional 32-bit fixed-point division fast paths for PS2 EE, SPARC32
+   * and other 32-bit FT_Long platforms.  For power-of-two divisors,
+   * compute the rounded FT_DivFix quotient using shifts only.  For
+   * other divisors, use ordinary 32-bit division ONLY when the complete
+   * biased numerator provably fits in 32 bits.  All other cases retain
+   * the original FreeType division implementation.
+   *
+   * This is portable integer C and remains available when
+   * FT_CONFIG_OPTION_NO_ASSEMBLER is defined.  It is disabled by
+   * default and deliberately restricted to a 32-bit FT_Long ABI.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32 */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
