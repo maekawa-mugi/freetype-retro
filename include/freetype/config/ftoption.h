@@ -261,6 +261,43 @@ FT_BEGIN_HEADER
    */
 /* #define FT_CONFIG_OPTION_MMI_LCD_SPANS */
 
+  /**************************************************************************
+   *
+   * Optional scalar grouping for the 4x oversampled smooth overlap
+   * rasterizer.  Adjacent source subpixels from one FT_Span contribute
+   * to one output byte; combining up to four additions preserves the
+   * original sum - (sum >> 8) byte behavior, including rollover.
+   * This is portable integer code for EE/SPARC and disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional long monochrome raster span fill with standard memset.
+   * The original short-byte loop and bitmasked edge bytes are unchanged.
+   * Useful as a portable comparison against the explicit SIMD variants.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MONO_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Opt-in R5900 EE MMI 128-bit SQ store for long 0xFF MONO spans.
+   * Requires an R5900 assembler and supports aligned quadword writes.
+   * Disabled by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_MMI_MONO_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Opt-in SPARC VIS1-class 64-bit STD store for long 0xFF MONO spans.
+   * Requires SPARC floating-point doubleword stores and is disabled by
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_MONO_SPANS */
+
 
   /**************************************************************************
    *
