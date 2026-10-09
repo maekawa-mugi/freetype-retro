@@ -207,8 +207,9 @@ static uint64_t rb_screen_median6(const uint64_t data[RB_SAMPLES])
 }
 static void rb_screen_start(void)
 {
-  init_scr(); /* initializes the GS framebuffer/display */
   unsigned i;
+  init_scr(); /* initializes the GS framebuffer/display */
+  scr_setCursor(0); /* disable visible cursor / end-of-line block */
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,0);
   scr_printf("FREETYPE RETRO | PS2 EE MMI | VALIDATION + BENCHMARK");
