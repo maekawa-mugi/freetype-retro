@@ -12,6 +12,8 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_VIS1_GRAY_SPANS` | SPARC VIS1 | 8-byte aligned stores for grayscale spans >=64px |
 | `FT_CONFIG_OPTION_MMI_BITMAP_CONVERT` | PS2 R5900 | MONO/GRAY2/GRAY4 16-pixel conversion |
 | `FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT` | SPARC VIS1 | MONO/GRAY2/GRAY4 8-pixel conversion with FPMERGE |
+| `FT_CONFIG_OPTION_RETRO_BLEND_EXACT255` | Both (portable C) | Exact BGRA integer /255 + transparent pixel skip |
+| `FT_CONFIG_OPTION_RETRO_BLEND_LUT` | Both (portable C) | Adaptive premultiplied color/alpha LUT for >=2048-pixel masks |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables these paths.  A standalone
 `ftgrays.c` build remains scalar.  The 64-byte span threshold is an
@@ -25,6 +27,8 @@ From the repository root:
 
 The command also runs `tests/convert_simd_model.c` for 197,376
 packed conversion format, width and address-alignment combinations.
+It now also runs `tests/blend_exact255_model.c` to check all 65,026
+integer-division numerators and 35,840 differential BGRA row cases.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -60,6 +64,19 @@ and odd widths. **The test hashes only active output pixels** because
 FT_Bitmap_Convert does not initialize destination row padding.
 
 See `docs/RETRO_BITMAP_CONVERT.md` for details and memory costs.
+
+### Exact BGRA bitmap composition output
+
+Compile `tests/blend_freetype_compare.c` against the scalar and optimized
+FreeType libraries.  Compare its result fingerprints for 11,520
+BGRA blending API cases, including fully transparent, opaque and
+mixed-alpha colors, small and large bitmap dimensions, and padded
+positive-pitch source buffers.  The existing negative-pitch BGRA
+handling has `XXX` stubs in FreeType and is out of scope.
+
+See `docs/RETRO_BITMAP_BLEND.md` for exactness, the LUT setup cost,
+and its 1280-byte stack footprint.  These are portable C fast paths,
+not additional MMI/VIS1 instructions.
 
 ## Tier C: end-to-end glyph rendering
 
