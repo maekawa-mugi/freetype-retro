@@ -213,6 +213,40 @@ def analyze(log, min_speedup, min_lower, max_jitter):
             choices[case] = "SELECT " + ready[0]["variant"]
     return rows, choices, invalid
 
+def provisional_crossover(choices):
+    """Only report supported observed size boundaries, never extrapolate.
+
+    A suffix that has the SAME selected variant for the largest measured
+    size(s) may suggest a provisional switch lower bound. No exact
+    crossover can be inferred between sparse 16/256/4096-size samples.
+    """
+    grouped = defaultdict(list)
+    for name, choice in choices.items():
+        family, dash, tail = name.rpartition("-")
+        if dash and tail.isdigit():
+            grouped[family].append((int(tail), choice))
+    bounds = {}
+    for family, data in sorted(grouped.items()):
+        if len(data) < 2:
+            continue
+        data.sort()
+        last_choice = data[-1][1]
+        if not last_choice.startswith("SELECT "):
+            continue
+        variant = last_choice[len("SELECT "):]
+        first = len(data) - 1
+        while first > 0 and data[first - 1][1] == last_choice:
+            first -= 1
+        lower = data[first][0]
+        sizes = [item[0] for item in data]
+        bounds[family] = {
+            "candidate": variant,
+            "observed_wins_at_or_above": lower,
+            "measured_sizes": sizes,
+            "qualification": "provisional sampled boundary only; sweep intermediate sizes",
+        }
+    return bounds
+
 def markdown_report(items):
     lines = [
         "# FreeType retro: correctness-gated benchmark decisions",
@@ -229,6 +263,17 @@ def markdown_report(items):
     for info in items:
         for case, choice in info["choices"].items():
             lines.append(f"| {info['target']} | {case} | {choice} |")
+    lines += ["", "## Provisional size crossovers (measured inputs only)", "",
+              "| Target | Workload | Candidate | Winning measured sizes from |",
+              "| --- | --- | --- | ---: |"]
+    for info in items:
+        for workload, data in info["crossovers"].items():
+            lines.append(f"| {info['target']} | {workload} | "
+                         f"{data['candidate']} | "
+                         f"{data['observed_wins_at_or_above']} |")
+    lines += ["", "These are NOT exact automatic dispatcher thresholds: "
+              "benchmark intermediate sizes before changing production flags.",
+              ""]
     lines += ["", "## Individual alternatives", "",
               "| Target | Case | Variant | Speedup | CI 90% | Verdict |",
               "| --- | --- | --- | ---: | --- | --- |"]
@@ -274,7 +319,7 @@ def main():
                 if parsed["meta"] else "unknown",
                 "build": parsed["meta"]["build"] if parsed["meta"] else "unknown",
                 "failures": parsed["failures"], "rows": rows,
-                "choices": choices}
+                "choices": choices, "crossovers": provisional_crossover(choices)}
         items.append(info)
         for error in parsed["failures"]:
             print("ERROR:", error, file=sys.stderr)
