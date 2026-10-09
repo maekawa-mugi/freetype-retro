@@ -14,17 +14,13 @@ fi
   echo "Missing crt0.o or PS2SDK startup linkfile" >&2
   exit 1
 }
-out=${1:-"$root/build-retro-bench/retro-bench-ps2.elf"}
+out=${1:-"$root/build-retro-bench/freetype_mmi.elf"}
+build_jobs=${BUILD_JOBS:-${JOBS:-$(nproc)}}
+(( build_jobs >= 1 )) || { echo "BUILD_JOBS must be >= 1" >&2; exit 2; }
 mkdir -p "$(dirname "$out")"
 build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
-"$cc" -O2 -std=c99 -march=r5900 -G0 -D_EE -DRETRO_BENCH_R5900 \
-  "-DRETRO_BENCH_BUILD_ID=\"ps2-r5900-$build_id\"" \
-  -ffunction-sections -fdata-sections \
-  -I"$PS2SDK/ee/include" -I"$PS2SDK/common/include" \
-  "$root/tests/retro_bench/bench.c" \
-  -B"$crt_dir/" -T"$PS2SDK/ee/startup/linkfile" \
-  -L"$PS2SDK/ee/lib" -Wl,-zmax-page-size=128,--gc-sections \
-  "-Wl,-Map,$out.map" -Wl,--start-group -ldebug -lc -lcglue -lkernel \
-  -Wl,--end-group -o "$out"
+make -f "$root/tests/retro_bench/Makefile.ps2" -j "$build_jobs" \
+  ROOT="$root" OUT="$out" EE_CC="$cc" CRT_DIR="$crt_dir" \
+  PS2SDK="$PS2SDK" BUILD_ID="$build_id" all
 printf 'Built (NOT RUN): %s\n' "$out"
 printf 'Capture RB1 stdout in PCSX2/EE; run verdict.py on a host.\n'
