@@ -1,7 +1,7 @@
 /* Deterministic glyph raster bitmap fingerprint for scalar/SIMD builds.
  *
  * Usage:
- *   retro-glyph-hash path/to/font.ttf [normal|mono|lcd|lcd-v]
+ *   retro-glyph-hash path/to/font.ttf [normal|mono|lcd|lcd-v|overlap]
  *
  * Use the SAME font file with the scalar and SIMD FreeType libraries.
  * The program hashes glyph metrics and every allocated bitmap byte,
@@ -63,6 +63,7 @@ main( int argc, char** argv )
   FT_Library     lib;
   FT_Face        face;
   FT_Render_Mode mode = FT_RENDER_MODE_NORMAL;
+  int           force_overlap = 0;
   unsigned      si;
   FT_ULong       cp;
   unsigned long  rendered = 0;
@@ -71,7 +72,7 @@ main( int argc, char** argv )
 
   if ( argc < 2 || argc > 3 )
   {
-    fprintf( stderr, "usage: %s font.ttf [normal|mono|lcd|lcd-v]\n",
+    fprintf( stderr, "usage: %s font.ttf [normal|mono|lcd|lcd-v|overlap]\n",
              argv[0] );
     return 2;
   }
@@ -84,6 +85,8 @@ main( int argc, char** argv )
       mode = FT_RENDER_MODE_LCD;
     else if ( !strcmp( argv[2], "lcd-v" ) )
       mode = FT_RENDER_MODE_LCD_V;
+    else if ( !strcmp( argv[2], "overlap" ) )
+      force_overlap = 1;
     else if ( strcmp( argv[2], "normal" ) )
     {
       fprintf( stderr, "unknown render mode: %s\n", argv[2] );
@@ -130,10 +133,25 @@ main( int argc, char** argv )
       if ( !index )
         continue;
 
-      if ( FT_Load_Glyph( face, index, FT_LOAD_DEFAULT ) ||
-           FT_Render_Glyph( face->glyph, mode ) )
+      if ( FT_Load_Glyph( face, index, FT_LOAD_DEFAULT ) )
       {
-        fprintf( stderr, "Failed glyph U+%04lX at %u px\n", cp, sizes[si] );
+        fprintf( stderr, "Failed loading U+%04lX at %u px\n",
+                 cp, sizes[si] );
+        FT_Done_Face( face );
+        FT_Done_FreeType( lib );
+        return 1;
+      }
+
+      /* Explicitly exercise the 4x oversampled renderer instead of
+       * relying on a font to carry an overlapping outline flag. */
+      if ( force_overlap &&
+           face->glyph->format == FT_GLYPH_FORMAT_OUTLINE )
+        face->glyph->outline.flags |= FT_OUTLINE_OVERLAP;
+
+      if ( FT_Render_Glyph( face->glyph, mode ) )
+      {
+        fprintf( stderr, "Failed rendering U+%04lX at %u px\n",
+                 cp, sizes[si] );
         FT_Done_Face( face );
         FT_Done_FreeType( lib );
         return 1;
