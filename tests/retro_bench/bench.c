@@ -160,7 +160,6 @@ static const char* const rb_screen_names[RB_SCREEN_GROUPS]={
   "Bitmap OR", "Pack MONO", "Pack GRAY2",
   "Pack GRAY4", "GRAY8 Emb"
 };
-static unsigned rb_screen_completed;
 
 /* All returns are literal group indices, never user data. */
 static unsigned rb_screen_group(int kind)
@@ -801,10 +800,14 @@ int main(void)
   uint64_t elapsed,hz=clock_hz(),begin,end;
   const struct rb_case* t;
 
+  /* PS2: actually initialize the GS debug framebuffer before any
+   * validation or timing. Even failures display a persistent screen.
+   * Host/SPARC builds have no-op screen functions. */
+  rb_screen_start();
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
   if(sizeof(void*)!=4 || sizeof(long)!=4){
     fprintf(stderr,"RB1,FATAL,abi,expected-32-bit-long-and-pointers\n");
-    return 2;
+    return rb_screen_hold(2,"ABI ERROR","32-bit toolchain required");
   }
 #endif
   printf("RB1,META,%s,%s,%u,%llu\n",
@@ -812,17 +815,21 @@ int main(void)
          (unsigned long long)hz);
   fflush(stdout);
   /* Full buffer correctness and guard checks BEFORE any timings. */
-  for(j=0;j<nc;j++)
+  for(j=0;j<nc;j++){
+    rb_screen_progress("VERIFY",j+1,cases[j].name);
     if(!validate_case(&cases[j])){
       fprintf(stderr,"RB1,FATAL,%s,correctness\n",cases[j].name);
-      return 1;
+      return rb_screen_hold(1,"CHECK FAILED",cases[j].name);
     }
+  }
   printf("RB1,GATE,PASS,%u\n",nc);
   fflush(stdout);
   rb_offset=16U; /* force aligned timing on real VIS1/MMI targets */
   for(j=0;j<nc;j++){
+    uint64_t samples[4][RB_SAMPLES]={{0}};
     t=&cases[j];
     n=variants(t->kind);
+    rb_screen_progress("BENCH",j+1,t->name);
     /* AB/BA and ABC/BCA/CAB; stable input, rotated thermal/cache order */
     for(s=0;s<RB_SAMPLES;s++){
       uint32_t sample_digests[4]={0,0,0,0};
@@ -835,8 +842,9 @@ int main(void)
         elapsed=end-begin;
         if(!elapsed){
           fprintf(stderr,"RB1,FATAL,%s,zero-ticks\n",t->name);
-          return 2;
+          return rb_screen_hold(2,"TIMER FAILED",t->name);
         }
+        samples[v][s]=elapsed;
         sample_digests[v]=digest(t);
         /* Timer is already stopped before hashing or I/O. */
         printf("RB1,SAMPLE,%s,%s,%u,%u,%llu,%llu,%08lx\n",
@@ -848,10 +856,15 @@ int main(void)
       for(v=1;v<n;v++)
         if(sample_digests[v]!=sample_digests[0]){
           fprintf(stderr,"RB1,FATAL,%s,timed-digest-mismatch\n",t->name);
-          return 1;
+          return rb_screen_hold(1,"RESULT MISMATCH",t->name);
         }
     }
+    /* Post-timer median for immediate on-screen provisional results.
+     * Robust paired CI/noise decisions remain in verdict.py on host. */
+    rb_screen_record(t,samples,n);
   }
   printf("RB1,DONE,PASS,%u\n",nc);
-  return 0;
+  fflush(stdout);
+  rb_screen_results_page();
+  return rb_screen_hold(0,"ALL CHECKS OK","see RB1 log for sizes");
 }
