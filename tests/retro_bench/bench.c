@@ -61,8 +61,8 @@ static void (*volatile cold_gray_prepare)(FT_Retro_BGRA_Gray_Table*)
 static void (*volatile cold_mono_prepare)(FT_Retro_Mono_Embolden_Table*,FT_UInt)
     = ft_bitmap_retro_mono_embolden_prepare;
 
-enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_COLD,BLEND_SPR,BLEND_SPR_COLD,
-       BGRA,BGRA_COLD,BGRA_SPR,BGRA_SPR_COLD,MONO,MONO_COLD,MONO_SPR,MONO_SPR_COLD,OVERLAP,GRAYFILL,ROW_OR,
+enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_COLD,
+       BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
        PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8,
        EMBOLDEN_GRAY8_X2,EMBOLDEN_GRAY8_X3,EMBOLDEN_GRAY8_X4 };
 struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
@@ -86,37 +86,16 @@ static const struct rb_case cases[] = {
   {"blend-4096",BLEND,4096,10},
   {"blend-cold-16",BLEND_COLD,16,120},
   {"blend-cold-4096",BLEND_COLD,4096,10},
-#if defined(RETRO_BENCH_R5900)
-  {"blend-spr-16",BLEND_SPR,16,200},
-  {"blend-spr-512",BLEND_SPR,512,36},
-  {"blend-spr-4096",BLEND_SPR,4096,10},
-  {"blend-spr-cold-16",BLEND_SPR_COLD,16,120},
-  {"blend-spr-cold-4096",BLEND_SPR_COLD,4096,10},
-#endif
   {"bgra-16",BGRA,16,500},
   {"bgra-512",BGRA,512,120},
   {"bgra-4096",BGRA,4096,16},
   {"bgra-cold-16",BGRA_COLD,16,320},
   {"bgra-cold-4096",BGRA_COLD,4096,16},
-#if defined(RETRO_BENCH_R5900)
-  {"bgra-spr-16",BGRA_SPR,16,500},
-  {"bgra-spr-512",BGRA_SPR,512,120},
-  {"bgra-spr-4096",BGRA_SPR,4096,16},
-  {"bgra-spr-cold-16",BGRA_SPR_COLD,16,320},
-  {"bgra-spr-cold-4096",BGRA_SPR_COLD,4096,16},
-#endif
   {"mono-16",MONO,16,320},
   {"mono-512",MONO,512,80},
   {"mono-4096",MONO,4096,12},
   {"mono-cold-16",MONO_COLD,16,300},
   {"mono-cold-4096",MONO_COLD,4096,12},
-#if defined(RETRO_BENCH_R5900)
-  {"mono-spr-16",MONO_SPR,16,320},
-  {"mono-spr-512",MONO_SPR,512,80},
-  {"mono-spr-4096",MONO_SPR,4096,12},
-  {"mono-spr-cold-16",MONO_SPR_COLD,16,300},
-  {"mono-spr-cold-4096",MONO_SPR_COLD,4096,12},
-#endif
   {"overlap-64",OVERLAP,64,256},
   {"overlap-4096",OVERLAP,4096,32},
   {"grayfill-16",GRAYFILL,16,300},
@@ -178,8 +157,6 @@ struct rb_screen_entry {
   int present;
 };
 static struct rb_screen_entry rb_screen_results[RB_SCREEN_GROUPS];
-/* 4096-pixel WARM LUT placement summary: RAM LUT / SPR LUT. */
-static unsigned rb_spr_pct[3], rb_spr_seen[3];
 static const char* const rb_screen_names[RB_SCREEN_GROUPS]={
   "MSB", "MulFix", "DivFix", "MulDiv", "MulDiv NR",
   "SqrtFixed", "LCD H", "LCD V", "BGRA Blend",
@@ -266,16 +243,9 @@ static int rb_screen_hold(int status,const char* phase,const char* name)
              status?"RESULT: FAIL":"RESULT: PASS",phase,name);
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,23);
-  if(!status && rb_spr_seen[0] && rb_spr_seen[1])
-    scr_printf("SPR LUT RAM/SPR  Gray:%u.%02ux  Blend:%u.%02ux       ",
-               rb_spr_pct[0]/100,rb_spr_pct[0]%100,
-               rb_spr_pct[1]/100,rb_spr_pct[1]%100);
-  else scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
+  scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
   scr_setXY(0,24);
-  if(!status && rb_spr_seen[2])
-    scr_printf("SPR MONO RAM/SPR %u.%02ux | complete RB1 log required   ",
-               rb_spr_pct[2]/100,rb_spr_pct[2]%100);
-  else scr_printf("COMPLETE | results retained on screen");
+  scr_printf("COMPLETE | results retained on screen");
   fflush(stdout);
   SleepThread();
   return status; /* unlikely to return */
@@ -288,27 +258,11 @@ static void rb_screen_record(const struct rb_case* t,
   uint64_t med[4],baseline;
   unsigned percent;
   struct rb_screen_entry* dst;
-  /* Retain a three-family 4096-pixel SPR summary for screenshot-only
-   * measurements. Log all warm/cold sizes via RB1 as before. */
-  if(t->size==4096U &&
-      (t->kind==BGRA_SPR || t->kind==BLEND_SPR || t->kind==MONO_SPR)){
-    unsigned i=t->kind==BGRA_SPR?0U:t->kind==BLEND_SPR?1U:2U;
-    unsigned ram=t->kind==BLEND_SPR?2U:1U;
-    unsigned spr=nvariants-1U;
-    uint64_t a=rb_screen_median6(samples[ram]);
-    uint64_t b=rb_screen_median6(samples[spr]);
-    rb_spr_pct[i]=b?(unsigned)(a*100U/b):0U;
-    rb_spr_seen[i]=1;
-    return;
-  }
   if(g>=RB_SCREEN_GROUPS)return;
 
   /* This is the representative largest normal-size case. Cold LUT
    * timings are still fully recorded, but do not replace it here. */
   if(t->kind==BLEND_COLD || t->kind==BGRA_COLD ||
-     t->kind==BGRA_SPR || t->kind==BGRA_SPR_COLD ||
-     t->kind==BLEND_SPR || t->kind==BLEND_SPR_COLD ||
-     t->kind==MONO_SPR || t->kind==MONO_SPR_COLD ||
      t->kind==MONO_COLD)return;
 
   if(t->kind==MSB && nvariants>1)base=1; /* FreeType builtin clz */
@@ -442,15 +396,6 @@ static const char* label(int kind,unsigned v)
   case OVERLAP:
     if(v==0)return "scalar";if(v==1)return "option_c";
     break;
-  case BLEND_SPR:case BLEND_SPR_COLD:
-    if(v==0)return "scalar";if(v==1)return "exact255";
-    if(v==2)return "lut_ram";return "lut_spr";
-  case MONO_SPR:case MONO_SPR_COLD:
-    if(v==0)return "scalar";if(v==1)return "lut_ram";
-    return "lut_spr";
-  case BGRA_SPR:case BGRA_SPR_COLD:
-    if(v==0)return "scalar";if(v==1)return "lut_ram";
-    return "lut_spr";
   case LCD:case LCD_V:case LCD_V_NEG:
     if(v==0)return "scalar";if(v==1)return "folded_c";
 #if defined(RETRO_BENCH_R5900)
@@ -506,9 +451,7 @@ static unsigned variants(int kind)
 #else
     return 2;
 #endif
-  if(kind==BLEND_SPR||kind==BLEND_SPR_COLD)return 4;
-  if(kind==BLEND||kind==BLEND_COLD||kind==BGRA_SPR||kind==BGRA_SPR_COLD||
-     kind==MONO_SPR||kind==MONO_SPR_COLD)return 3;
+  if(kind==BLEND||kind==BLEND_COLD)return 3;
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
   if(kind==GRAYFILL||kind==ROW_OR)return 3;
 #endif
@@ -533,7 +476,7 @@ static unsigned reset_bytes(const struct rb_case* t)
   switch(t->kind){
   case LCD:return n*2U+64U;
   case LCD_V:case LCD_V_NEG:return n*5U+64U;
-  case BLEND:case BLEND_COLD:case BLEND_SPR:case BLEND_SPR_COLD:return n*4U+64U;
+  case BLEND:case BLEND_COLD:return n*4U+64U;
   default:return n+64U;
   }
 }
@@ -563,19 +506,7 @@ static void prepare(const struct rb_case* t,unsigned run_seed)
     ft_bitmap_retro_blend_prepare(&blend_table,color);
   }
   ft_bitmap_retro_bgra_gray_prepare(&gray_table);
-#if defined(RETRO_BENCH_R5900)
-  /* Bench-only SPR table. Caller must reserve EE scratchpad 0x70000000.
-   * Warm runs exclude placement; COLD includes per-call table rebuild. */
-  if(t->kind==BGRA_SPR || t->kind==BGRA_SPR_COLD)
-    memcpy((void *)(uintptr_t)0x70000000u,&gray_table,sizeof(gray_table));
-  if(t->kind==BLEND_SPR || t->kind==BLEND_SPR_COLD)
-    memcpy((void *)(uintptr_t)0x70000000u,&blend_table,sizeof(blend_table));
-#endif
   ft_bitmap_retro_mono_embolden_prepare(&mono_table,4);
-#if defined(RETRO_BENCH_R5900)
-  if(t->kind==MONO_SPR || t->kind==MONO_SPR_COLD)
-    memcpy((void *)(uintptr_t)0x70000000u,&mono_table,sizeof(mono_table));
-#endif
   memset(output,0xA5,sizeof(output));
   memset(result,0,sizeof(result));
   escape_sink=0;
@@ -740,20 +671,6 @@ static void kernel(const struct rb_case* t,unsigned v)
 #endif
     }
     break;
-  case BLEND_SPR:case BLEND_SPR_COLD:
-#if defined(RETRO_BENCH_R5900)
-    if(v==0)blend_original(output+rb_offset,input,n,color);
-    else if(v==1)ft_bitmap_retro_blend_row(output+rb_offset,input,n,color);
-    else if(v==2){
-      if(kind==BLEND_SPR_COLD) cold_blend_prepare(&blend_table,color);
-      ft_bitmap_retro_blend_row_lut(output+rb_offset,input,n,&blend_table);
-    }else {
-      FT_Retro_Blend_LUT* const spr=(FT_Retro_Blend_LUT*)(uintptr_t)0x70000000u;
-      if(kind==BLEND_SPR_COLD)cold_blend_prepare(spr,color);
-      ft_bitmap_retro_blend_row_lut(output+rb_offset,input,n,spr);
-    }
-#endif
-    break;
   case BLEND:case BLEND_COLD:
     if(v==2 && kind==BLEND_COLD)
       cold_blend_prepare(&blend_table,color);
@@ -761,37 +678,11 @@ static void kernel(const struct rb_case* t,unsigned v)
     else if(v==1)ft_bitmap_retro_blend_row(output+rb_offset,input,n,color);
     else ft_bitmap_retro_blend_row_lut(output+rb_offset,input,n,&blend_table);
     break;
-  case BGRA_SPR:case BGRA_SPR_COLD:
-#if defined(RETRO_BENCH_R5900)
-    if(v==2){
-      FT_Retro_BGRA_Gray_Table* const spr=(FT_Retro_BGRA_Gray_Table*)(uintptr_t)0x70000000u;
-      if(kind==BGRA_SPR_COLD)ft_bitmap_retro_bgra_gray_prepare(spr);
-      ft_bitmap_retro_bgra_gray_row(output+rb_offset,input,n,spr);
-    }else if(v==1){
-      if(kind==BGRA_SPR_COLD)ft_bitmap_retro_bgra_gray_prepare(&gray_table);
-      ft_bitmap_retro_bgra_gray_row(output+rb_offset,input,n,&gray_table);
-    }else bgra_original(output+rb_offset,input,n);
-#endif
-    break;
   case BGRA:case BGRA_COLD:
     if(v && kind==BGRA_COLD)
       cold_gray_prepare(&gray_table);
     if(v==0)bgra_original(output+rb_offset,input,n);
     else ft_bitmap_retro_bgra_gray_row(output+rb_offset,input,n,&gray_table);
-    break;
-  case MONO_SPR:case MONO_SPR_COLD:
-#if defined(RETRO_BENCH_R5900)
-    if(v==0)mono_original(output+rb_offset,n);
-    else if(v==1){
-      if(kind==MONO_SPR_COLD)cold_mono_prepare(&mono_table,4);
-      ft_bitmap_retro_mono_embolden_row(output+rb_offset,(int)n,&mono_table);
-    }else{
-      FT_Retro_Mono_Embolden_Table* const spr=
-        (FT_Retro_Mono_Embolden_Table*)(uintptr_t)0x70000000u;
-      if(kind==MONO_SPR_COLD)cold_mono_prepare(spr,4);
-      ft_bitmap_retro_mono_embolden_row(output+rb_offset,(int)n,spr);
-    }
-#endif
     break;
   case MONO:case MONO_COLD:
     if(v && kind==MONO_COLD)

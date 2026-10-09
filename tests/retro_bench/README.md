@@ -1,37 +1,5 @@
 # FreeType Retro: correctness-gated A/B/C kernel benchmark
 
-## Extended scratchpad LUT hypotheses
-
-The same PS2 ELF now also tests blend-spr-{16,512,4096},
-blend-spr-cold-{16,4096}, mono-spr-{16,512,4096} and
-mono-spr-cold-{16,4096}. WARM and COLD match the existing BGRA
-gray experiment. Blend compares scalar, exact255, RAM LUT and
-SPR LUT (four contenders); MONO compares scalar and two LUT placements.
-Each is correctness gated and exports complete RB1 case/sample data.
-The final GS screenshot also shows RAM/SPR warm speed ratios for
-BGRA Gray, BGRA Blend and MONO Embolden at size 4096.
-Ratios above 1 mean SPR won the placement-only comparison.
-The screenshots are provisional; full RB1 logs are still required.
-
-
-## PS2 scratchpad BGRA Gray benchmark
-
-The R5900 bench adds bgra-spr-{16,512,4096} (warm) and
-bgra-spr-cold-{16,4096} (cold) to the RB1 manifest. Each compares
-scalar, lut_ram, and lut_spr with five correctness trials and six
-paired timing samples, compatible with the existing verdict.py.
-
-The 3,072-byte gray LUT is located in 16 KiB EE scratchpad at
-0x70000000 only for these PS2 benchmark cases. Warm runs exclude
-placement cost; cold runs rebuild the LUT inside the timed call.
-Production helpers and the normal GS BGRA winner remain unchanged.
-SPR must be exclusively owned by this standalone ELF; there is no DMA.
-
-Build normally: bash tests/retro_bench/build-ps2.sh
-Capture complete RB1 stdout and run verdict.py on it. Neither the
-cross-build nor execution on PCSX2 or real hardware has been verified.
-
-
 This is a standalone comparator ported **in design** from
 [openssl-retro `codex/ps2-ee-mmi-test:test/ps2`](https://github.com/maekawa-mugi/openssl-retro/tree/codex/ps2-ee-mmi-test/test/ps2)
 (`main.c`, `bench.c`, `build.sh`, `check-bench.py`).
