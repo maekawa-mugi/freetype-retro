@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from verdict import analyze, parse_file
+from verdict import analyze, parse_file, provisional_crossover
 
 def fixture(candidate_ticks=(80, 81, 79, 80, 82, 78),
             bad_check=False, bad_digest=False, incomplete=False):
@@ -58,6 +58,17 @@ class VerdictTests(unittest.TestCase):
         _, choices, invalid = self.load(fixture(incomplete=True))
         self.assertTrue(invalid)
         self.assertTrue(choices["suite-64"].startswith("BLOCKED"))
+
+    def test_provisional_boundary_only_when_largest_size_wins(self):
+        choices = {"bgra-16": "KEEP SCALAR (no proven winner)",
+                   "bgra-256": "SELECT option_c",
+                   "bgra-4096": "SELECT option_c",
+                   "lcd-16": "SELECT folded_c",
+                   "lcd-4096": "INCONCLUSIVE"}
+        bounds = provisional_crossover(choices)
+        self.assertEqual(bounds["bgra"]["observed_wins_at_or_above"], 256)
+        self.assertEqual(bounds["bgra"]["candidate"], "option_c")
+        self.assertNotIn("lcd", bounds)
 
     def test_missing_scalar_checks_does_not_crash(self):
         _, choices, invalid = self.load(
