@@ -115,3 +115,23 @@ Select only the matching CPU, and inspect the compiler-generated
 MULT/MFHI/MFLO or SMUL/RD %y assembly before timing it.
 
 See docs/RETRO_MULFIX.md for assembly and ABI caveats.
+
+Most-significant bit on R5900 and SPARC32
+========================================
+
+The host batch script also compiles tests/msb_semantics_model.c.
+It checks 2,048,706 patterns against the scalar reference, including
+zero, sign bit, powers, low-16 exhaustiveness and one million random
+words.  It uses the actual De Bruijn helper, while R5900 PLZCW is
+modeled (not executed) on the host.
+
+For cross-compiled target builds, tests/msb_target_compare.c exercises
+the internal FT_MSB interface on nonzero inputs, verifying the output
+and producing a fingerprint for approximately 1.39 million inputs.
+The default builtin clz is intentionally not called with zero.
+
+FT_CONFIG_OPTION_RETRO_MSB_R5900 uses PLZCW.
+FT_CONFIG_OPTION_RETRO_MSB_SPARC32 uses portable De Bruijn arithmetic.
+Neither switch is enabled by default.  Do not select both at once.
+
+See docs/RETRO_MSB.md for ISA semantics, limits and target checks.
