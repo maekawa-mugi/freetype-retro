@@ -24,6 +24,10 @@
 
 #include "ftsmerrs.h"
 
+#ifdef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
+#include "ftsmooth_retro_overlap.h"
+#endif
+
 #if defined( FT_CONFIG_OPTION_SUBPIXEL_RENDERING ) && \
     ( defined( FT_CONFIG_OPTION_RETRO_LCD_SPANS ) || \
       defined( FT_CONFIG_OPTION_MMI_LCD_SPANS ) )
@@ -501,8 +505,10 @@
 
 
     unsigned char*  dst = target->origin - ( y / SCALE ) * target->pitch;
+#ifndef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
     unsigned int    x, i;
     unsigned int    cover, sum;
+#endif
 
 
     /* When accumulating the oversampled spans we need to assure that  */
@@ -512,6 +518,10 @@
     /* is clamped to 255 when it adds up to 256.                       */
     for ( ; count--; spans++ )
     {
+#ifdef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
+      ft_smooth_retro_overlap_span( dst, (unsigned short)spans->x,
+                                    spans->len, spans->coverage );
+#else
       cover = ( spans->coverage + SCALE * SCALE / 2 ) / ( SCALE * SCALE );
       for ( x = 0; x < spans->len; x++ )
       {
@@ -519,6 +529,7 @@
         sum    = dst[i] + cover;
         dst[i] = (unsigned char)( sum - ( sum >> 8 ) );
       }
+#endif
     }
   }
 
