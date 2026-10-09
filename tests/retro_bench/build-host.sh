@@ -4,8 +4,9 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 out=${1:-"$root/build-retro-bench/retro-bench-host"}
 mkdir -p "$(dirname -- "$out")"
+build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
 ${CC:-cc} -O2 -std=c99 -Wall -Wextra -D_POSIX_C_SOURCE=200809L \
-  '-DRETRO_BENCH_BUILD_ID="host-standalone"' \
+  "-DRETRO_BENCH_BUILD_ID=\"host-$build_id\"" \
   ${CFLAGS:-} "$root/tests/retro_bench/bench.c" \
   ${LDFLAGS:-} ${LDLIBS:-} -o "$out"
 printf 'Built (NOT RUN): %s\n' "$out"
