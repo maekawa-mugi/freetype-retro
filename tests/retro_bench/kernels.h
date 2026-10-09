@@ -14,6 +14,7 @@
 
 typedef uint8_t FT_Byte;
 typedef uint32_t FT_UInt32;
+typedef uint16_t FT_UInt16;
 typedef int32_t FT_Int32;
 typedef uint64_t FT_UInt64;
 typedef unsigned int FT_UInt;
@@ -96,11 +97,13 @@ static FT_UInt rb_msb_scalar(FT_UInt32 v)
  */
 #if defined(RETRO_BENCH_R5900)
 #include "../../src/base/ftbitmap_mmi.h"
+#include "../../src/base/ftbitmap_convert_mmi.h"
 #define FT_CONFIG_OPTION_MMI_GRAY_SPANS
 #define FT_MEM_SET(p,val,n) memset((p),(val),(n))
 #include "../../src/smooth/ftgrays_retro.h"
 #elif defined(RETRO_BENCH_SPARC32)
 #include "../../src/base/ftbitmap_vis1.h"
+#include "../../src/base/ftbitmap_convert_vis1.h"
 #define FT_CONFIG_OPTION_VIS1_GRAY_SPANS
 #define FT_MEM_SET(p,val,n) memset((p),(val),(n))
 #include "../../src/smooth/ftgrays_retro.h"
