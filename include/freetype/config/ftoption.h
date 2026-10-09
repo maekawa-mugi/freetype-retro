@@ -340,6 +340,35 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional PS2 R5900 MMI PLZCW most-significant-bit finder.
+   * Interprets the low 32-bit PLZCW count for positive nonzero words;
+   * returns 31 for words with bit 31 set and handles zero explicitly.
+   * Overrides the internal FT_MSB GCC builtin only when enabled.
+   *
+   * Requires R5900 MMI assembler with a 32-bit int/long ABI.
+   * Disabled by default and by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MSB_R5900 */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC32 De Bruijn integer most-significant-bit lookup.
+   * Five bit-spreading shifts, 32-bit unsigned multiplication and a
+   * 32-entry (32-byte) constant table replace the compiler's default
+   * __builtin_clz expansion.  This is ordinary integer C, not VIS1.
+   * Performance depends on compiler instruction selection and cache.
+   *
+   * Requires GCC-compatible 32-bit SPARC.  Disabled by default and
+   * by FT_CONFIG_OPTION_NO_ASSEMBLER to retain the baseline.
+   *
+   * Do not enable both retro FT_MSB options at the same time.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MSB_SPARC32 */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
