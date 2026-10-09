@@ -423,6 +423,23 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional exact FT_Outline_Transform fast paths (portable C):
+   * - return immediately for identity transformation matrices;
+   * - for diagonal matrices use two FT_MulFix calls per point, not four;
+   * - for general matrices inline the unchanged four fixed-point
+   *   multiplies without a per-point FT_Vector_Transform call.
+   *
+   * The matrix is read as the point loop progresses, retaining unusual
+   * alias behavior, and the original arithmetic/order is preserved.
+   * Performance depends on compiler inlining and on actual outline
+   * transformation patterns.  Disabled by default and independent
+   * of FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
