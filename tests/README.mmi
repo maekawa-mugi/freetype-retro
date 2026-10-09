@@ -81,7 +81,7 @@ Host batch script: sh tests/run_retro_simd_models.sh
 tests/overlap_mono_model.c checks the actual opt-in portable helper
 against the original pixel update and monochrome span algorithms:
 
-  - 17,408 exhaustive 4x overlap carry/rollover identities
+  - 17,408 exhaustive repeated 4x overlap correction comparisons
   - 33,408 overlap spans with a second overlapping span
   - 82,176 MONO full-span and masked-edge byte comparisons
 
@@ -96,3 +96,22 @@ optimized FreeType builds and compare the following fingerprint modes:
 
 The overlap mode explicitly sets FT_OUTLINE_OVERLAP on an outline.
 See docs/RETRO_OVERLAP_MONO.md for CPU-specific flags and limitations.
+
+Fixed-point multiply for R5900 and SPARC32
+==========================================
+
+The host runner now includes tests/mulfix_rounding_model.c.
+It compares FreeType's exact signed 64-bit FT_MulFix rounding against
+the target backends' shared HI:LO word-rounding routine in 1,037,663
+boundary and deterministic cases. It does NOT execute ISA assembly.
+
+Build and run tests/mulfix_freetype_compare.c against the scalar
+and target-specific FreeType builds separately; compare its full
+775,517-case fingerprint for exact public FT_MulFix output.
+
+Both FT_CONFIG_OPTION_RETRO_MULFIX_R5900 and
+FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 require a 32-bit FT_Long ABI.
+Select only the matching CPU, and inspect the compiler-generated
+MULT/MFHI/MFLO or SMUL/RD %y assembly before timing it.
+
+See docs/RETRO_MULFIX.md for assembly and ABI caveats.
