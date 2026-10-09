@@ -212,7 +212,13 @@
   FT_MulFix( FT_Long  a_,
              FT_Long  b_ )
   {
-#ifdef FT_CONFIG_OPTION_INLINE_MULFIX
+#ifdef FT_MULFIX_ASSEMBLER
+
+    /* Also accelerate public FT_MulFix, not only internal inline calls.
+     * The retro implementation shares the exact FreeType rounding rule. */
+    return FT_MULFIX_ASSEMBLER( (FT_Int32)a_, (FT_Int32)b_ );
+
+#elif defined( FT_CONFIG_OPTION_INLINE_MULFIX )
 
     return FT_MulFix_64( a_, b_ );
 
@@ -223,7 +229,7 @@
     /* this requires arithmetic right shift of signed numbers */
     return (FT_Long)( ( ab + 0x8000L + ( ab >> 63 ) ) >> 16 );
 
-#endif /* FT_CONFIG_OPTION_INLINE_MULFIX */
+#endif /* retro assembler or inline/default FT_MulFix */
   }
 
 
