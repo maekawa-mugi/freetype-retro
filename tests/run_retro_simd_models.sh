@@ -15,3 +15,5 @@ trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 "$test_dir/retro-lcd-model"
 "$CC" $CFLAGS tests/overlap_mono_model.c -o "$test_dir/retro-overlap-mono-model"
 "$test_dir/retro-overlap-mono-model"
+"$CC" $CFLAGS tests/mulfix_rounding_model.c -o "$test_dir/retro-mulfix-model"
+"$test_dir/retro-mulfix-model"
