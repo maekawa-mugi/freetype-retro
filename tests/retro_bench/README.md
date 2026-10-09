@@ -46,7 +46,20 @@ For each suite and input size:
    sample median, 90% deterministic bootstrap confidence interval and
    median absolute deviation (MAD). Do not pool different architectures
    or multiple executables as if they were paired.
-5. A candidate is **ELIGIBLE** only when its median is at least 1.05x
+5. The comparator knows the **actual baseline already used by FreeType**:
+for `msb-*` on GCC, it is `__builtin_clz`, and for long
+`grayfill-*` spans it is `memset`. Portable bit scanning and
+hand-written loops are still measured but are diagnostic-only.
+The emulated `hi_lo_words` MulFix rounder is similarly a
+correctness/timing control, not a deployable hardware choice.
+Those controls cannot be automatically selected as a winner.
+
+Mutating kernels restore only their active input/output region per
+repetition (not the entire maximum-sized static buffer), applying
+identical copy cost to all variants. The full guard region is checked
+during pre-benchmark correctness validation.
+
+A candidate is **ELIGIBLE** only when its median is at least 1.05x
    faster, the 90% lower confidence bound exceeds 1.02x, and MAD is
    no more than 12% of median candidate time. If fastest eligible
    variants have overlapping uncertainty, report **TIE**.
