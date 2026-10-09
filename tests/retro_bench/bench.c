@@ -42,7 +42,8 @@ static volatile FT_UInt32 escape_sink;
 
 enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_COLD,
        BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
-       PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8 };
+       PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8,
+       EMBOLDEN_GRAY8_X2,EMBOLDEN_GRAY8_X3,EMBOLDEN_GRAY8_X4 };
 struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
 static const struct rb_case cases[] = {
   {"msb-1024",MSB,1024,48},
@@ -97,6 +98,12 @@ static const struct rb_case cases[] = {
   {"embolden-gray8-64",EMBOLDEN_GRAY8,64,180},
   {"embolden-gray8-512",EMBOLDEN_GRAY8,512,80},
   {"embolden-gray8-4096",EMBOLDEN_GRAY8,4096,16},
+  {"embolden-gray8-x2-512",EMBOLDEN_GRAY8_X2,512,70},
+  {"embolden-gray8-x2-4096",EMBOLDEN_GRAY8_X2,4096,12},
+  {"embolden-gray8-x3-512",EMBOLDEN_GRAY8_X3,512,70},
+  {"embolden-gray8-x3-4096",EMBOLDEN_GRAY8_X3,4096,12},
+  {"embolden-gray8-x4-512",EMBOLDEN_GRAY8_X4,512,70},
+  {"embolden-gray8-x4-4096",EMBOLDEN_GRAY8_X4,4096,12},
 #endif
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
@@ -177,7 +184,8 @@ static const char* label(int kind,unsigned v)
 #endif
     break;
   case PACK_MONO:case PACK_GRAY2:case PACK_GRAY4:
-  case EMBOLDEN_GRAY8:
+  case EMBOLDEN_GRAY8:case EMBOLDEN_GRAY8_X2:
+  case EMBOLDEN_GRAY8_X3:case EMBOLDEN_GRAY8_X4:
     if(v==0)return "scalar";
 #if defined(RETRO_BENCH_R5900)
     if(v==1)return "mmi";
@@ -481,18 +489,28 @@ static void kernel(const struct rb_case* t,unsigned v)
     else ft_bitmap_vis1_convert_gray4_row(input+16,output+16,n);
 #endif
     break;
-  case EMBOLDEN_GRAY8:
-    if(v==0){
-      int x;
-      for(x=(int)n-1;x>=0;x--){
-        unsigned sum=output[16+x];
-        if(x)sum+=output[16+x-1];
-        output[16+x]=(FT_Byte)(sum>255U?255U:sum);
+  case EMBOLDEN_GRAY8:case EMBOLDEN_GRAY8_X2:
+  case EMBOLDEN_GRAY8_X3:case EMBOLDEN_GRAY8_X4:
+    {
+      unsigned strength=kind==EMBOLDEN_GRAY8?1U:
+                        kind==EMBOLDEN_GRAY8_X2?2U:
+                        kind==EMBOLDEN_GRAY8_X3?3U:4U;
+      if(v==0){
+        int x;
+        for(x=(int)n-1;x>=0;x--){
+          unsigned i;
+          for(i=1;i<=strength && x>=(int)i;i++){
+            unsigned sum=(unsigned)output[16+x]+output[16+x-i];
+            output[16+x]=(FT_Byte)(sum>255U?255U:sum);
+            if(sum>=255U)break;
+          }
+        }
       }
-    }
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_gray8_embolden_one(output+16,(FT_Int)n);
+      else ft_bitmap_mmi_gray8_embolden_small(output+16,(FT_Int)n,
+                                               (FT_Int)strength);
 #endif
+    }
     break;
   default:break;
   }
