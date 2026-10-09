@@ -52,6 +52,10 @@
 #include "ftbitmap_blend_retro.h"
 #endif
 
+#ifdef FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT
+#include "ftbitmap_bgra_gray_retro.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -795,6 +799,15 @@
       {
         FT_UInt  i;
 
+#ifdef FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT
+        FT_Retro_BGRA_Gray_Table  table;
+        FT_Bool                   use_table =
+          (FT_ULong)source->width * source->rows >= 4096UL;
+
+
+        if ( use_table )
+          ft_bitmap_retro_bgra_gray_prepare( &table );
+#endif
 
         target->num_grays = 256;
 
@@ -805,6 +818,12 @@
           FT_UInt   j;
 
 
+#ifdef FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT
+          if ( use_table )
+            ft_bitmap_retro_bgra_gray_row( tt, ss, source->width,
+                                            &table );
+          else
+#endif
           for ( j = source->width; j > 0; j-- )
           {
             tt[0] = ft_gray_for_premultiplied_srgb_bgra( ss );
