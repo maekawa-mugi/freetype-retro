@@ -160,3 +160,25 @@ rewritten; this ensures FT_MSB backend changes do not alter the
 Newton iteration output or the reported normalized length.
 
 See docs/RETRO_DIVFIX_NORMLEN.md for configurations and caveats.
+
+32-bit fixed-point square root (FT_INT64 only)
+==============================================
+
+Enable FT_CONFIG_OPTION_RETRO_SQRT_RESTORING to replace the existing
+FT_SqrtFixed Babylonian division loop with an exact 24-step
+division-free 32-bit restoring square root. The implementation is
+portable unsigned C and works on both EE and SPARC32. It is off
+by default and has no effect in non-FT_INT64 FreeType builds.
+
+The deferred host batch now includes tests/sqrtfixed_restoring_model.c:
+1,458,915 cases compare the real restoring helper to the original
+Babylonian method and to an independent integer binary-search oracle.
+The model does not execute hardware-specific instructions.
+
+The test tests/sqrtfixed_freetype_compare.c fingerprints 512,307
+FT_SqrtFixed calls from a matching STATIC FreeType archive.
+Build baseline and optimized variants with the same 32-bit ABI
+and FT_INT64 configuration; compare whole output lines.
+
+See docs/RETRO_SQRTFIXED.md for the exact rounding invariant,
+implementation scope and later target-performance checks.
