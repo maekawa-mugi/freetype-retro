@@ -467,22 +467,32 @@ int main(void)
     t=&cases[j];
     n=variants(t->kind);
     /* AB/BA and ABC/BCA/CAB; stable input, rotated thermal/cache order */
-    for(s=0;s<RB_SAMPLES;s++)for(step=0;step<n;step++){
-      v=(step+s)%n;
-      prepare(t,UINT32_C(0x7d5192ab));
-      begin=timestamp();
-      run(t,v,t->reps);
-      end=timestamp();
-      elapsed=end-begin;
-      if(!elapsed){
-        fprintf(stderr,"RB1,FATAL,%s,zero-ticks\n",t->name);
-        return 2;
+    for(s=0;s<RB_SAMPLES;s++){
+      uint32_t sample_digests[4]={0,0,0,0};
+      for(step=0;step<n;step++){
+        v=(step+s)%n;
+        prepare(t,UINT32_C(0x7d5192ab));
+        begin=timestamp();
+        run(t,v,t->reps);
+        end=timestamp();
+        elapsed=end-begin;
+        if(!elapsed){
+          fprintf(stderr,"RB1,FATAL,%s,zero-ticks\n",t->name);
+          return 2;
+        }
+        sample_digests[v]=digest(t);
+        /* Timer is already stopped before hashing or I/O. */
+        printf("RB1,SAMPLE,%s,%s,%u,%u,%llu,%llu,%08lx\n",
+               t->name,label(t->kind,v),s,t->reps,
+               (unsigned long long)elapsed,(unsigned long long)hz,
+               (unsigned long)sample_digests[v]);
+        fflush(stdout);
       }
-      printf("RB1,SAMPLE,%s,%s,%u,%u,%llu,%llu,%08lx\n",
-             t->name,label(t->kind,v),s,t->reps,
-             (unsigned long long)elapsed,(unsigned long long)hz,
-             (unsigned long)digest(t));
-      fflush(stdout);
+      for(v=1;v<n;v++)
+        if(sample_digests[v]!=sample_digests[0]){
+          fprintf(stderr,"RB1,FATAL,%s,timed-digest-mismatch\n",t->name);
+          return 1;
+        }
     }
   }
   printf("RB1,DONE,PASS,%u\n",nc);
