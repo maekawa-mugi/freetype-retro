@@ -24,7 +24,7 @@ build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
   "$root/tests/retro_bench/bench.c" \
   -B"$crt_dir/" -T"$PS2SDK/ee/startup/linkfile" \
   -L"$PS2SDK/ee/lib" -Wl,-zmax-page-size=128,--gc-sections \
-  "-Wl,-Map,$out.map" -Wl,--start-group -lc -lcglue -lkernel \
+  "-Wl,-Map,$out.map" -Wl,--start-group -ldebug -lc -lcglue -lkernel \
   -Wl,--end-group -o "$out"
 printf 'Built (NOT RUN): %s\n' "$out"
 printf 'Capture RB1 stdout in PCSX2/EE; run verdict.py on a host.\n'
