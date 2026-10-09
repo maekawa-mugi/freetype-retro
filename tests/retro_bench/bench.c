@@ -41,7 +41,7 @@ static FT_Retro_Mono_Embolden_Table mono_table;
 static volatile FT_UInt32 escape_sink;
 
 enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,BLEND,BLEND_COLD,
-       BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL };
+       BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR };
 struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
 static const struct rb_case cases[] = {
   {"msb-1024",MSB,1024,48},
@@ -72,7 +72,10 @@ static const struct rb_case cases[] = {
   {"overlap-4096",OVERLAP,4096,32},
   {"grayfill-16",GRAYFILL,16,300},
   {"grayfill-512",GRAYFILL,512,120},
-  {"grayfill-4096",GRAYFILL,4096,16}
+  {"grayfill-4096",GRAYFILL,4096,16},
+  {"bitmap-or-16",ROW_OR,16,400},
+  {"bitmap-or-512",ROW_OR,512,100},
+  {"bitmap-or-4096",ROW_OR,4096,16}
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
 
@@ -141,6 +144,15 @@ static const char* label(int kind,unsigned v)
     break;
   case GRAYFILL:
     if(v==0)return "scalar_loop";if(v==1)return "memset";
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+    if(v==2)return "target_span";
+#endif
+    break;
+  case ROW_OR:
+    if(v==0)return "scalar";if(v==1)return "portable_loop";
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+    if(v==2)return "target_or";
+#endif
     break;
   }
   return "unsupported";
@@ -166,6 +178,9 @@ static unsigned variants(int kind)
     return 2;
 #endif
   if(kind==BLEND||kind==BLEND_COLD)return 3;
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+  if(kind==GRAYFILL||kind==ROW_OR)return 3;
+#endif
   return 2;
 }
 static unsigned target_bytes(const struct rb_case* t)
@@ -369,7 +384,18 @@ static void kernel(const struct rb_case* t,unsigned v)
     } break;
   case GRAYFILL:
     if(v==0)for(i=0;i<n;i++)output[16+i]=179;
-    else memset(output+16,179,n);
+    else if(v==1)memset(output+16,179,n);
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+    else ft_gray_retro_fill(output+16,179,(int)n);
+#endif
+    break;
+  case ROW_OR:
+    if(v<2)for(i=0;i<n;i++)output[16+i]|=input[16+i];
+#if defined(RETRO_BENCH_R5900)
+    else ft_bitmap_mmi_or_row(output+16,input+16,(FT_Int)n);
+#elif defined(RETRO_BENCH_SPARC32)
+    else ft_bitmap_vis1_or_row(output+16,input+16,(FT_Int)n);
+#endif
     break;
   default:break;
   }
