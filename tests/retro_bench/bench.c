@@ -817,6 +817,21 @@ int main(void)
   printf("RB1,META,%s,%s,%u,%llu\n",
          RB_TARGET,RETRO_BENCH_BUILD_ID,RB_SAMPLES,
          (unsigned long long)hz);
+
+  /* Declare the complete workload/variant manifest before testing.
+   * verdict.py requires exactly five CHECK and six SAMPLE rows for
+   * every declared variant, and GATE/DONE must match nc.  A captured
+   * log missing an entire suite must never produce a recommendation.
+   */
+  for(j=0;j<nc;j++){
+    unsigned k;
+    const struct rb_case* entry=&cases[j];
+
+    printf("RB1,CASE,%s,%u,%u",entry->name,entry->reps,entry->size);
+    for(k=0;k<variants(entry->kind);k++)
+      printf(",%s",label(entry->kind,k));
+    putchar('\n');
+  }
   fflush(stdout);
   /* Full buffer correctness and guard checks BEFORE any timings. */
   for(j=0;j<nc;j++){
