@@ -440,6 +440,21 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional exact BGRA to GRAY conversion for large color bitmaps.
+   * Build 3 component-square lookup tables (3072 bytes on the stack)
+   * only for conversions of at least 4096 pixels.  This removes
+   * per-pixel weighted RGB square multiplications but preserves
+   * the original unsaturated sum, >>16 rounding and alpha division.
+   *
+   * Portable C for both EE and SPARC.  The 4096-pixel threshold is a
+   * provisional heuristic until actual bitmap workloads are profiled.
+   * Disabled by default; unaffected by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
