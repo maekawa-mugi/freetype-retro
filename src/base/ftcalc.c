@@ -42,6 +42,11 @@
 #include "ftdivfix_retro.h"
 #endif
 
+#if defined( FT_CONFIG_OPTION_RETRO_SQRT_RESTORING ) && \
+    defined( FT_INT64 )
+#include "ftsqrtrestro.h"
+#endif
+
   /* cancel inlining macro from internal/ftcalc.h */
 #ifdef FT_MulFix
 #  undef FT_MulFix
@@ -916,6 +921,13 @@
     if ( v == 0 )
       return 0;
 
+#if defined( FT_CONFIG_OPTION_RETRO_SQRT_RESTORING ) && \
+    defined( FT_INT64 )
+
+    return ft_sqrt_retro_restoring( v );
+
+#else /* original FT_SqrtFixed algorithm */
+
 #ifndef FT_INT64
 
     /* Algorithm by Christophe Meessen (1993) with overflow fixed and     */
@@ -972,6 +984,8 @@
 
       return q;
     }
+
+#endif /* optional restoring FT_SqrtFixed */
   }
 
 
