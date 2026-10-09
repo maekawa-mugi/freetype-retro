@@ -310,6 +310,33 @@ FT_BEGIN_HEADER
    */
 #define FT_CONFIG_OPTION_INLINE_MULFIX
 
+  /**************************************************************************
+   *
+   * Optional PS2 Emotion Engine R5900 32-bit ABI FT_MulFix override.
+   * Uses signed MULT, HI/LO result registers and exactly reproduces
+   * the original signed 16.16 rounding (including negative ties).
+   * Optimizes both the internal inlined calls and the exported API.
+   *
+   * GCC-compatible R5900 32-bit assembly is required.  Builds with
+   * a 64-bit FT_Long are deliberately rejected.  Disabled by default.
+   * FT_CONFIG_OPTION_NO_ASSEMBLER restores FreeType's original path.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULFIX_R5900 */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC32 integer multiply FT_MulFix override, intended for
+   * UltraSPARC VIS1-class machines with the 32-bit ABI.  Uses SMUL and
+   * a read of the upper signed product in the Y register followed by
+   * exact FreeType 16.16 rounding.  VIS1 floating-point instructions
+   * are NOT needed for this scalar fixed-point operation.
+   *
+   * Do not enable both retro FT_MulFix backends at the same time.
+   * Disabled by default and suppressed by NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 */
+
 
   /**************************************************************************
    *
