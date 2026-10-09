@@ -455,6 +455,22 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional exact lookup for large packed-MONO bitmap emboldening.
+   * For horizontal strength 2..8, precompute two 256-byte lookup
+   * tables that OR the original byte with the right-shifted bits
+   * and include the left-neighbour bits in their original order.
+   *
+   * The table is used only when the padded pitch times row count
+   * reaches 1024 bytes; otherwise the original per-byte algorithm
+   * stays active.  The lookup uses 512 stack bytes and no heap.
+   * It is portable C, disabled by default, and works regardless
+   * of FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
