@@ -57,7 +57,9 @@ Those controls cannot be automatically selected as a winner.
 Mutating kernels restore only their active input/output region per
 repetition (not the entire maximum-sized static buffer), applying
 identical copy cost to all variants. The full guard region is checked
-during pre-benchmark correctness validation.
+during pre-benchmark correctness validation. Timed MMI/VIS1 buffers
+are explicitly 16-byte aligned; all five preflight offsets exercise
+unaligned prefixes and tails as well.
 
 A candidate is **ELIGIBLE** only when its median is at least 1.05x
    faster, the 90% lower confidence bound exceeds 1.02x, and MAD is
@@ -73,6 +75,10 @@ Run PCSX2/real PS2 and real SPARC **separately**. For true threshold
 selection (e.g. 64 vs 256 vs 4096 bytes), use the smallest range
 where a variant consistently wins; never infer an exact switch point
 from only three sizes.
+
+The report also derives **provisional size crossover hints** from
+measured consecutive winning sizes. Those are not precise automatic
+thresholds: benchmark more sizes around each observed transition.
 
 ## Matrix and candidate provenance
 
