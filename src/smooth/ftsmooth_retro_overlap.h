@@ -62,8 +62,9 @@ ft_smooth_retro_overlap_span( FT_Byte*  dst,
 
   if ( first )
   {
-    dst[pixel++] = ft_smooth_retro_overlap_add( dst[pixel],
-                                                first * cover );
+    dst[pixel] = ft_smooth_retro_overlap_add( dst[pixel],
+                                               first * cover );
+    pixel++;
     length -= first;
   }
 
