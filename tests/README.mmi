@@ -37,3 +37,19 @@ fingerprint for 16,560 deterministic cases; compare the entire lines.
 Only active pixels are hashed, not potentially uninitialized row padding.
 
 See docs/RETRO_BITMAP_CONVERT.md and docs/RETRO_SIMD_TEST_PLAN.md.
+
+BGRA blending (common portable integer fast paths)
+=================================================
+
+The same host batch command also compiles and runs
+`tests/blend_exact255_model.c`, which enumerates all 65,026 possible
+numerators of an 8-bit by 8-bit product and compares 35,840 complete
+BGRA rows against the original FreeType arithmetic. Both direct and
+adaptive lookup-table routines are exercised in the byte model.
+
+Compile `tests/blend_freetype_compare.c` with scalar and optimized
+FreeType builds separately to fingerprint 11,520 public-API blend cases.
+Because the upstream BGRA negative-pitch path is not yet implemented,
+only positive-pitch blend API inputs are used in this test.
+
+See `docs/RETRO_BITMAP_BLEND.md`.
