@@ -16,6 +16,10 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_BLEND_LUT` | Both (portable C) | Adaptive premultiplied color/alpha LUT for >=2048-pixel masks |
 | `FT_CONFIG_OPTION_RETRO_LCD_SPANS` | Both (portable C) | Exact five-tap LCD folding into constant-increment horizontal/vertical spans |
 | `FT_CONFIG_OPTION_MMI_LCD_SPANS` | PS2 R5900 | 16-byte PADDB wrapping additions for long LCD span increments, plus portable folding |
+| `FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS` | Both (portable C) | Group four 4x raster subpixel additions exactly |
+| `FT_CONFIG_OPTION_RETRO_MONO_SPANS` | Both (portable C) | Long MONO interior bytes via memset, preserving masked edges |
+| `FT_CONFIG_OPTION_MMI_MONO_SPANS` | PS2 R5900 | 128-bit aligned SQ stores for full long MONO span interiors |
+| `FT_CONFIG_OPTION_VIS1_MONO_SPANS` | SPARC VIS1 | 64-bit aligned doubleword stores for full long MONO span interiors |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables these paths.  A standalone
 `ftgrays.c` build remains scalar.  The 64-byte span threshold is an
@@ -35,6 +39,11 @@ integer-division numerators and 35,840 differential BGRA row cases.
 The batch also runs `tests/lcd_spans_model.c`, exercising the common
 LCD five-tap folded implementation in 165,120 length/offset/weight/coverage
 and positive/negative-pitch cases, including overlapping spans.
+
+The command additionally compiles `tests/overlap_mono_model.c`, containing
+17,408 exhaustive overlap-carry identities, 33,408 full overlap-span
+comparisons, and 82,176 MONO interior/edge-byte comparisons.  The
+native MMI/VIS1 instruction stores are not run by this host model.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -104,6 +113,13 @@ Run with the exact same TTF/OTF font bytes:
     ./retro-glyph-hash /path/to/font.ttf mono
     ./retro-glyph-hash /path/to/font.ttf lcd
     ./retro-glyph-hash /path/to/font.ttf lcd-v
+    ./retro-glyph-hash /path/to/font.ttf overlap
+
+The `overlap` mode forces `FT_OUTLINE_OVERLAP` on each outline to
+exercise 4x smooth raster oversampling even if the font does not supply
+this flag.  `mono` exercises the monochrome rasterizer.  In both
+cases test short and very wide glyphs on the same target CPU.  See
+`docs/RETRO_OVERLAP_MONO.md` for the new kernels and edge cases.
 
 For a given font and mode, compare the output line between baseline and
 optimized builds.  This covers the real gray rasterizer, including
