@@ -232,3 +232,43 @@ padding. Compare fingerprints from the same scalar/optimized
 FreeType revision. No tests were run while preparing the PR.
 
 See docs/RETRO_MONO_EMBOLDEN_LUT.md.
+
+Multi-candidate A/B/C benchmarks (OpenSSL-derived PS2 harness)
+=============================================================
+
+The new tests/retro_bench/ directory adapts the design of
+maekawa-mugi/openssl-retro:codex/ps2-ee-mmi-test/test/ps2.
+It compiles scalar and optional target kernels into the SAME binary,
+checks five full-buffer seeded cases per backend, then measures six
+alternating-order samples with output digests outside timing.
+
+The included target scripts only BUILD:
+  sh tests/retro_bench/build-host.sh
+  bash tests/retro_bench/build-ps2.sh
+  sh tests/retro_bench/build-sparc.sh
+
+After future PCSX2, EE or SPARC execution, capture all RB1 stdout
+lines and run the verdict parser on your host:
+  python3 tests/retro_bench/verdict.py console.log --json result.json --markdown result.md
+
+The parser rejects correctness failures, missing samples and
+mismatched checksums, then estimates median scalar/candidate speedup,
+90 percent paired bootstrap interval and sample jitter. It selects
+only reproducibly faster alternatives, reports ties and inconclusive
+measurements, and makes size-specific decisions for 16/64/256/512/
+4096-byte or pixel workloads. The cold-LUT workloads include table
+preparation inside timing.
+
+The standalone harness covers the actual MulDiv/DivFix/SqrtFixed/MSB,
+LCD (including LCD_V and negative pitch), BGRA blend/convert,
+MONO embolden, overlap, MMI/VIS1 bitmap OR and packed conversion,
+and EE GRAY8 embolden kernels. All hardware-specific options compile
+only on a matching target, not on the host.
+
+IMPORTANT: this is only the *first* approval gate. Public FreeType
+API output comparison, real font glyph hashes, ISA disassembly and
+real workload end-to-end timing are still required. No runs occurred
+during harness preparation.
+
+See tests/retro_bench/README.md for full matrix, clocks, timing
+boundaries, build IDs, runner commands and verdict meanings.
