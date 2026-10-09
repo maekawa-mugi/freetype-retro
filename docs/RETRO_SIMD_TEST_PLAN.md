@@ -21,9 +21,10 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_MMI_MONO_SPANS` | PS2 R5900 | 128-bit aligned SQ stores for full long MONO span interiors |
 | `FT_CONFIG_OPTION_VIS1_MONO_SPANS` | SPARC VIS1 | 64-bit aligned doubleword stores for full long MONO span interiors |
 
-`FT_CONFIG_OPTION_NO_ASSEMBLER` disables these paths.  A standalone
-`ftgrays.c` build remains scalar.  The 64-byte span threshold is an
-unmeasured heuristic.
+`FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
+assembly but not the portable C optimizations.  Standalone builds of
+`ftgrays.c` and `ftraster.c` remain scalar.  The 64-byte span threshold
+is an unmeasured heuristic.
 
 ## Tier A: host model (architecture-independent)
 
