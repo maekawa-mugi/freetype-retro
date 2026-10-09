@@ -239,6 +239,28 @@ FT_BEGIN_HEADER
    */
 /* #define FT_CONFIG_OPTION_RETRO_BLEND_LUT */
 
+  /**************************************************************************
+   *
+   * Optional scalar exact five-tap LCD filtering.  Precompute five
+   * independently rounded contributions once per raster span, then
+   * accumulate the central uniform region as one wrapping byte addition.
+   * Works for SPARC VIS1, R5900 and other CPUs.  Disabled by default.
+   * Requires FT_CONFIG_OPTION_SUBPIXEL_RENDERING to have any effect.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_LCD_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional R5900 MMI wrapping PADDB acceleration for long uniform
+   * LCD span increments.  Includes the common exact five-tap folding
+   * above.  The minimum span length of 64 is a provisional heuristic.
+   * Requires FT_CONFIG_OPTION_SUBPIXEL_RENDERING and R5900 with MMI
+   * assembler support.  FT_CONFIG_OPTION_NO_ASSEMBLER disables only
+   * the MMI portion, retaining the scalar exact folding.
+   */
+/* #define FT_CONFIG_OPTION_MMI_LCD_SPANS */
+
 
   /**************************************************************************
    *
