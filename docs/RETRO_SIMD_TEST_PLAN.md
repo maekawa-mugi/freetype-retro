@@ -22,6 +22,8 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_VIS1_MONO_SPANS` | SPARC VIS1 | 64-bit aligned doubleword stores for full long MONO span interiors |
 | `FT_CONFIG_OPTION_RETRO_MULFIX_R5900` | PS2 R5900 32-bit ABI | Signed MULT and HI/LO with exact FreeType fixed-point rounding |
 | `FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32` | SPARC 32-bit ABI | SMUL, RD %y and exact FreeType fixed-point rounding |
+| `FT_CONFIG_OPTION_RETRO_MSB_R5900` | PS2 R5900 | Optional PLZCW unsigned MSB mapping, guarding bit31 and zero |
+| `FT_CONFIG_OPTION_RETRO_MSB_SPARC32` | SPARC 32-bit ABI | Optional 32-bit De Bruijn most-significant-bit index via 32-byte table |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -52,6 +54,11 @@ The host runner also executes `tests/mulfix_rounding_model.c`, with
 1,037,663 boundary, signed-tie and pseudorandom operand pairs.  This
 uses the actual shared HI/LO rounding helper, not target multiplication
 instructions.
+
+The runner additionally includes `tests/msb_semantics_model.c`. It
+compares the real SPARC32 De Bruijn helper and an EE PLZCW word model
+to a portable 32-bit reference across 2,048,706 input patterns. This
+model does not execute the R5900 instruction.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -119,6 +126,19 @@ also affect inlined internal calls, so check Tier C glyph fingerprints.
 Consult `docs/RETRO_MULFIX.md` for instruction hazard, ABI and test
 requirements.  The R5900 and SPARC32 implementations are mutually
 exclusive and disabled by `FT_CONFIG_OPTION_NO_ASSEMBLER`.
+
+### Most-significant-bit alternatives
+
+Run `tests/msb_target_compare.c` against baseline and optimized
+FreeType configurations on the **same target and compiler**.  It checks
+nonzero arguments against a reference, and compares fingerprints over
+approximately 1.39 million bit patterns.  Zero is intentionally skipped
+in the baseline test because `__builtin_clz(0)` is undefined.
+The R5900 `PLZCW` semantics come from the uploaded EE core manual;
+the 32-bit SPARC path uses a De Bruijn table, not VIS1 floating-point
+instructions.  Both alternatives must beat the already optimized GCC
+builtin expansion on real hardware to justify merging.  See
+`docs/RETRO_MSB.md`.
 
 ## Tier C: end-to-end glyph rendering
 
