@@ -243,6 +243,16 @@
 #define FT_ZERO( p )  FT_MEM_ZERO( p, sizeof ( *(p) ) )
 #endif
 
+/* Keep standalone monochrome raster builds unchanged. */
+#if !defined( STANDALONE_ ) && \
+    ( defined( FT_CONFIG_OPTION_RETRO_MONO_SPANS ) || \
+      ( !defined( FT_CONFIG_OPTION_NO_ASSEMBLER ) && \
+        ( defined( FT_CONFIG_OPTION_MMI_MONO_SPANS ) || \
+          defined( FT_CONFIG_OPTION_VIS1_MONO_SPANS ) ) ) )
+#define FT_RASTER_RETRO_MONO_ENABLED
+#include "ftraster_retro_mono.h"
+#endif
+
   /* FMulDiv means `Fast MulDiv'; it is used in case where `b' is       */
   /* typically a small value and the result of a*b is known to fit into */
   /* 32 bits.                                                           */
@@ -2041,13 +2051,23 @@
       {
         target[0] |= f1;
 
-        /* memset() is slower than the following code on many platforms. */
-        /* This is due to the fact that, in the vast majority of cases,  */
-        /* the span length in bytes is relatively small.                 */
-        while ( --c2 > 0 )
-          *( ++target ) = 0xFF;
+#ifdef FT_RASTER_RETRO_MONO_ENABLED
+        /* Keep the original edge bitmasks, and bulk-fill ONLY complete
+         * interior bytes.  Short spans retain the original small loop. */
+        if ( c2 - 1 >= FT_RASTER_RETRO_MONO_MIN_BYTES )
+        {
+          ft_raster_retro_mono_fill( target + 1, c2 - 1 );
+          target[c2] |= f2;
+        }
+        else
+#endif
+        {
+          /* Usually faster than memset on very short MONO spans. */
+          while ( --c2 > 0 )
+            *( ++target ) = 0xFF;
 
-        target[1] |= f2;
+          target[1] |= f2;
+        }
       }
       else
         *target |= ( f1 & f2 );
