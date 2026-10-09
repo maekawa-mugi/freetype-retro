@@ -24,6 +24,17 @@
 
 #include "ftsmerrs.h"
 
+#ifdef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
+#include "ftsmooth_retro_overlap.h"
+#endif
+
+#if defined( FT_CONFIG_OPTION_SUBPIXEL_RENDERING ) && \
+    ( defined( FT_CONFIG_OPTION_RETRO_LCD_SPANS ) || \
+      defined( FT_CONFIG_OPTION_MMI_LCD_SPANS ) )
+#define FT_SMOOTH_RETRO_LCD_ENABLED
+#include "ftsmooth_retro_lcd.h"
+#endif
+
 
   /* sets render-specific mode */
   static FT_Error
@@ -286,10 +297,18 @@
     TOrigin*  target = (TOrigin*)target_;
 
     unsigned char*  dst_line = target->origin - y * target->pitch - 2;
+#ifndef FT_SMOOTH_RETRO_LCD_ENABLED
     unsigned char*  dst;
     unsigned short  w;
+#endif
 
 
+#ifdef FT_SMOOTH_RETRO_LCD_ENABLED
+    for ( ; count--; spans++ )
+      ft_smooth_retro_lcd_horizontal( dst_line + (unsigned short)spans->x,
+                                      spans->len, spans->coverage,
+                                      target->wght );
+#else
     for ( ; count--; spans++ )
       for ( dst = dst_line + (unsigned short)spans->x,
             w = spans->len; w--; dst++ )
@@ -300,6 +319,7 @@
         dst[3] += ( spans->coverage * target->wght[3] + 85 ) >> 8;
         dst[4] += ( spans->coverage * target->wght[4] + 85 ) >> 8;
       }
+#endif
   }
 
 
@@ -382,10 +402,18 @@
 
     int             pitch    = target->pitch;
     unsigned char*  dst_line = target->origin - ( y + 2 ) * pitch;
+#ifndef FT_SMOOTH_RETRO_LCD_ENABLED
     unsigned char*  dst;
     unsigned short  w;
+#endif
 
 
+#ifdef FT_SMOOTH_RETRO_LCD_ENABLED
+    for ( ; count--; spans++ )
+      ft_smooth_retro_lcd_vertical( dst_line + (unsigned short)spans->x,
+                                    spans->len, spans->coverage,
+                                    target->wght, pitch );
+#else
     for ( ; count--; spans++ )
       for ( dst = dst_line + (unsigned short)spans->x,
             w = spans->len; w--; dst++ )
@@ -396,6 +424,7 @@
         dst[3 * pitch] += ( spans->coverage * target->wght[3] + 85 ) >> 8;
         dst[4 * pitch] += ( spans->coverage * target->wght[4] + 85 ) >> 8;
       }
+#endif
   }
 
   static FT_Error
@@ -476,8 +505,10 @@
 
 
     unsigned char*  dst = target->origin - ( y / SCALE ) * target->pitch;
+#ifndef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
     unsigned int    x, i;
     unsigned int    cover, sum;
+#endif
 
 
     /* When accumulating the oversampled spans we need to assure that  */
@@ -487,6 +518,10 @@
     /* is clamped to 255 when it adds up to 256.                       */
     for ( ; count--; spans++ )
     {
+#ifdef FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS
+      ft_smooth_retro_overlap_span( dst, (unsigned short)spans->x,
+                                    spans->len, spans->coverage );
+#else
       cover = ( spans->coverage + SCALE * SCALE / 2 ) / ( SCALE * SCALE );
       for ( x = 0; x < spans->len; x++ )
       {
@@ -494,6 +529,7 @@
         sum    = dst[i] + cover;
         dst[i] = (unsigned char)( sum - ( sum >> 8 ) );
       }
+#endif
     }
   }
 

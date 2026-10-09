@@ -158,6 +158,149 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Enable the PlayStation 2 Emotion Engine (R5900) MMI implementation of
+   * selected FT_Bitmap_Embolden loops.  This is an opt-in implementation:
+   * it requires a GCC-compatible toolchain with R5900 MMI assembly support.
+   * Other architectures must not enable it.  The option is ignored if
+   * FT_CONFIG_OPTION_NO_ASSEMBLER is defined.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN */
+
+
+  /**************************************************************************
+   *
+   * Enable SPARC VIS1 acceleration of the vertical FT_Bitmap_Embolden
+   * bitmap OR pass.  This requires an SPARC target with VIS1 support
+   * (e.g. UltraSPARC) and a GCC-compatible assembler.  It is disabled
+   * by default and disabled by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_BITMAP_EMBOLDEN */
+
+
+  /**************************************************************************
+   *
+   * Optionally use R5900 MMI 128-bit aligned stores for long gray spans
+   * in the smooth rasterizer.  Spans shorter than 64 bytes use existing
+   * scalar/memset processing; target-specific compilation is required.
+   */
+/* #define FT_CONFIG_OPTION_MMI_GRAY_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optionally use SPARC 64-bit aligned FP doubleword stores for long
+   * gray spans in the smooth rasterizer.  Requires VIS1-class SPARC
+   * hardware with FP support and a GCC-compatible toolchain.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_GRAY_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional R5900 MMI packed MONO/GRAY2/GRAY4 to 8-bit conversion.
+   * Uses small lookup tables for MONO/GRAY2, and PEXTLB/PSRLH/PSLLH
+   * for aligned GRAY4 blocks.  PS2 R5900 and GCC-compatible assembler
+   * required.  The option is disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_CONVERT */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC VIS1 FPMERGE packed GRAY4 to 8-bit conversion.
+   * Requires big-endian SPARC with VIS1 and a GCC-compatible assembler.
+   * The option is disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT */
+
+
+  /**************************************************************************
+   *
+   * Optional exact integer optimization of FT_Bitmap_Blend.  Replaces
+   * division by 255 in BGRA color composition with an equivalent shift
+   * and add expression, and skips zero-coverage pixels.  This is normal
+   * portable integer C and can be used on both SPARC and PS2, even with
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.  Disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 */
+
+
+  /**************************************************************************
+   *
+   * Optional 256-entry coverage lookup table for FT_Bitmap_Blend.
+   * For masks of at least 2048 pixels, prepares 1280 bytes of premultiplied
+   * source colors and inverse alpha values once per blend call, to avoid
+   * repeated source-color multiplications per pixel.  Smaller bitmaps
+   * use the exact scalar path instead.  This option also enables the
+   * exact integer division-by-255 replacement above, without requiring
+   * FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 separately.
+   *
+   * On memory-constrained targets, enable this only after profiling.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_LUT */
+
+  /**************************************************************************
+   *
+   * Optional scalar exact five-tap LCD filtering.  Precompute five
+   * independently rounded contributions once per raster span, then
+   * accumulate the central uniform region as one wrapping byte addition.
+   * Works for SPARC VIS1, R5900 and other CPUs.  Disabled by default.
+   * Requires FT_CONFIG_OPTION_SUBPIXEL_RENDERING to have any effect.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_LCD_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional R5900 MMI wrapping PADDB acceleration for long uniform
+   * LCD span increments.  Includes the common exact five-tap folding
+   * above.  The minimum span length of 64 is a provisional heuristic.
+   * Requires FT_CONFIG_OPTION_SUBPIXEL_RENDERING and R5900 with MMI
+   * assembler support.  FT_CONFIG_OPTION_NO_ASSEMBLER disables only
+   * the MMI portion, retaining the scalar exact folding.
+   */
+/* #define FT_CONFIG_OPTION_MMI_LCD_SPANS */
+
+  /**************************************************************************
+   *
+   * Optional scalar grouping for the 4x oversampled smooth overlap
+   * rasterizer.  Adjacent source subpixels from one FT_Span contribute
+   * to one output byte; combining up to four additions preserves the
+   * original sum - (sum >> 8) byte behavior, including rollover.
+   * This is portable integer code for EE/SPARC and disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional long monochrome raster span fill with standard memset.
+   * The original short-byte loop and bitmasked edge bytes are unchanged.
+   * Useful as a portable comparison against the explicit SIMD variants.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MONO_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Opt-in R5900 EE MMI 128-bit SQ store for long 0xFF MONO spans.
+   * Requires an R5900 assembler and supports aligned quadword writes.
+   * Disabled by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_MMI_MONO_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Opt-in SPARC VIS1-class 64-bit STD store for long 0xFF MONO spans.
+   * Requires SPARC floating-point doubleword stores and is disabled by
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_VIS1_MONO_SPANS */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
@@ -166,6 +309,164 @@ FT_BEGIN_HEADER
    * you can disable this option.
    */
 #define FT_CONFIG_OPTION_INLINE_MULFIX
+
+  /**************************************************************************
+   *
+   * Optional PS2 Emotion Engine R5900 32-bit ABI FT_MulFix override.
+   * Uses signed MULT, HI/LO result registers and exactly reproduces
+   * the original signed 16.16 rounding (including negative ties).
+   * Optimizes both the internal inlined calls and the exported API.
+   *
+   * GCC-compatible R5900 32-bit assembly is required.  Builds with
+   * a 64-bit FT_Long are deliberately rejected.  Disabled by default.
+   * FT_CONFIG_OPTION_NO_ASSEMBLER restores FreeType's original path.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULFIX_R5900 */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC32 integer multiply FT_MulFix override, intended for
+   * UltraSPARC VIS1-class machines with the 32-bit ABI.  Uses SMUL and
+   * a read of the upper signed product in the Y register followed by
+   * exact FreeType 16.16 rounding.  VIS1 floating-point instructions
+   * are NOT needed for this scalar fixed-point operation.
+   *
+   * Do not enable both retro FT_MulFix backends at the same time.
+   * Disabled by default and suppressed by NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 */
+
+
+  /**************************************************************************
+   *
+   * Optional PS2 R5900 MMI PLZCW most-significant-bit finder.
+   * Interprets the low 32-bit PLZCW count for positive nonzero words;
+   * returns 31 for words with bit 31 set and handles zero explicitly.
+   * Overrides the internal FT_MSB GCC builtin only when enabled.
+   *
+   * Requires R5900 MMI assembler with a 32-bit int/long ABI.
+   * Disabled by default and by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MSB_R5900 */
+
+
+  /**************************************************************************
+   *
+   * Optional SPARC32 De Bruijn integer most-significant-bit lookup.
+   * Five bit-spreading shifts, 32-bit unsigned multiplication and a
+   * 32-entry (32-byte) constant table replace the compiler's default
+   * __builtin_clz expansion.  This is ordinary integer C, not VIS1.
+   * Performance depends on compiler instruction selection and cache.
+   *
+   * Requires GCC-compatible 32-bit SPARC.  Disabled by default and
+   * by FT_CONFIG_OPTION_NO_ASSEMBLER to retain the baseline.
+   *
+   * Do not enable both retro FT_MSB options at the same time.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MSB_SPARC32 */
+
+
+  /**************************************************************************
+   *
+   * Optional 32-bit fixed-point division fast paths for PS2 EE, SPARC32
+   * and other 32-bit FT_Long platforms.  For power-of-two divisors,
+   * compute the rounded FT_DivFix quotient using shifts only.  For
+   * other divisors, use ordinary 32-bit division ONLY when the complete
+   * biased numerator provably fits in 32 bits.  All other cases retain
+   * the original FreeType division implementation.
+   *
+   * This is portable integer C and remains available when
+   * FT_CONFIG_OPTION_NO_ASSEMBLER is defined.  It is disabled by
+   * default and deliberately restricted to a 32-bit FT_Long ABI.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32 */
+
+  /**************************************************************************
+   *
+   * Optional division-free FT_SqrtFixed for 32-bit PS2 EE, SPARC32,
+   * and other 32-bit FT_Long platforms that have FT_INT64 enabled.
+   *
+   * Uses a 24-step binary restoring square root on the 48-bit logical
+   * value (unsigned 32-bit input << 16).  All intermediate arithmetic
+   * uses unsigned 32-bit integers.  Rounds to the nearest integer by
+   * checking the final remainder, matching the FT_INT64 Babylonian
+   * result without invoking 64-bit division.
+   *
+   * Disabled by default.  Ignored when FT_INT64 is unavailable, since
+   * FreeType already has a division-free fallback for large inputs in
+   * that configuration.  FT_CONFIG_OPTION_NO_ASSEMBLER does not disable
+   * this portable C option.  Benchmark before enabling on real targets.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_SQRT_RESTORING */
+
+
+  /**************************************************************************
+   *
+   * Optional 32-bit FT_MulDiv and FT_MulDiv_No_Round shortcuts:
+   * - if either multiplier equals the divisor, return the other;
+   * - for safely bounded unsigned numerators, use native 32/32 div;
+   * - for power-of-two denominators, use a shift instead of long
+   *   division, preserving the existing 32-bit output behavior.
+   *
+   * On FT_INT64 builds this avoids some dynamic 64-bit division.
+   * On 32-bit-only builds the full 64-bit unsigned product is
+   * reconstructed into two 32-bit words for the shift path; huge
+   * quotients preserve the old 0x7FFFFFFF saturation sentinel.
+   *
+   * Disabled by default. Requires 32-bit FT_Long. Portable C works
+   * under FT_CONFIG_OPTION_NO_ASSEMBLER. Numerically distinct
+   * historic a+b-overflow cases always use the original implementation.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULDIV_FAST32 */
+
+
+  /**************************************************************************
+   *
+   * Optional exact FT_Outline_Transform fast paths (portable C):
+   * - return immediately for identity transformation matrices;
+   * - for diagonal matrices use two FT_MulFix calls per point, not four;
+   * - for general matrices inline the unchanged four fixed-point
+   *   multiplies without a per-point FT_Vector_Transform call.
+   *
+   * The matrix is read as the point loop progresses, retaining unusual
+   * alias behavior, and the original arithmetic/order is preserved.
+   * Performance depends on compiler inlining and on actual outline
+   * transformation patterns.  Disabled by default and independent
+   * of FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM */
+
+
+  /**************************************************************************
+   *
+   * Optional exact BGRA to GRAY conversion for large color bitmaps.
+   * Build 3 component-square lookup tables (3072 bytes on the stack)
+   * only for conversions of at least 4096 pixels.  This removes
+   * per-pixel weighted RGB square multiplications but preserves
+   * the original unsaturated sum, >>16 rounding and alpha division.
+   *
+   * Portable C for both EE and SPARC.  The 4096-pixel threshold is a
+   * provisional heuristic until actual bitmap workloads are profiled.
+   * Disabled by default; unaffected by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT */
+
+
+  /**************************************************************************
+   *
+   * Optional exact lookup for large packed-MONO bitmap emboldening.
+   * For horizontal strength 2..8, precompute two 256-byte lookup
+   * tables that OR the original byte with the right-shifted bits
+   * and include the left-neighbour bits in their original order.
+   *
+   * The table is used only when the padded pitch times row count
+   * reaches 1024 bytes; otherwise the original per-byte algorithm
+   * stays active.  The lookup uses 512 stack bytes and no heap.
+   * It is portable C, disabled by default, and works regardless
+   * of FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT */
 
 
   /**************************************************************************

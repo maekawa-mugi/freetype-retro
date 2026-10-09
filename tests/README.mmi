@@ -1,0 +1,274 @@
+SIMD emboldening model and deferred hardware checks
+=================================================
+
+Host-side model test:
+
+    sh tests/run_retro_simd_models.sh
+
+Or compile the deterministic model manually:
+
+    cc -O2 -Wall -Wextra -fsanitize=address,undefined \
+       tests/mmi_embolden_equivalence.c -o mmi-embolden-test
+    ./mmi-embolden-test
+
+It models byte-level QFSRV neighbour extraction, saturated PADDUB, MMI
+POR (16 bytes), and VIS1 FOR (8 bytes).  It now covers 72,000
+combinations including both pitch directions, all 16 byte alignments,
+short and long rows, 0..4 horizontal strength, and multiple grayscale
+limits.  It also checks the untouched guard and padding bytes.
+
+IMPORTANT: The host model cannot execute R5900 or VIS1 machine code.
+The MMI/VIS1 kernels still require separate target compiler checks,
+pixel-identity tests against unoptimized FreeType, and hardware
+benchmarks.  Deferred target testing is described in
+docs/MMI_EMBOLDEN.md and docs/VIS1_EMBOLDEN.md.
+
+Packed conversion batch tests
+=============================
+
+The same host batch command also runs tests/convert_simd_model.c with
+197,376 MMI/VIS1 packed conversion cases.  No hardware-specific code
+is run by this model.
+
+To compare the actual FreeType conversion output after building scalar
+and SIMD library variants separately, build
+`tests/convert_freetype_compare.c` against each variant.  It computes a
+fingerprint for 16,560 deterministic cases; compare the entire lines.
+Only active pixels are hashed, not potentially uninitialized row padding.
+
+See docs/RETRO_BITMAP_CONVERT.md and docs/RETRO_SIMD_TEST_PLAN.md.
+
+BGRA blending (common portable integer fast paths)
+=================================================
+
+The same host batch command also compiles and runs
+`tests/blend_exact255_model.c`, which enumerates all 65,026 possible
+numerators of an 8-bit by 8-bit product and compares 35,840 complete
+BGRA rows against the original FreeType arithmetic. Both direct and
+adaptive lookup-table routines are exercised in the byte model.
+
+Compile `tests/blend_freetype_compare.c` with scalar and optimized
+FreeType builds separately to fingerprint 11,520 public-API blend cases.
+Because the upstream BGRA negative-pitch path is not yet implemented,
+only positive-pitch blend API inputs are used in this test.
+
+See `docs/RETRO_BITMAP_BLEND.md`.
+
+LCD 5-tap filtering (FT_CONFIG_OPTION_SUBPIXEL_RENDERING only)
+==============================================================
+
+The host batch runner also includes tests/lcd_spans_model.c.
+It exercises 165,120 deterministic horizontal and vertical
+five-tap span cases with odd lengths, varying byte alignments,
+multiple weights/coverages, overlapping spans and both pitch signs.
+The test uses the actual portable folded implementation.
+
+FT_CONFIG_OPTION_RETRO_LCD_SPANS provides portable folding.
+FT_CONFIG_OPTION_MMI_LCD_SPANS additionally uses the R5900 PADDB
+wrapping byte-add SIMD for long spans. The MMI assembly has not
+been run by this host model and needs later target verification.
+
+For LCD glyph output comparisons, enable
+FT_CONFIG_OPTION_SUBPIXEL_RENDERING in both scalar and accelerated
+FreeType builds, then compare retro_glyph_hash lcd/lcd-v outputs.
+See docs/RETRO_LCD_SPANS.md.
+
+4x overlap and long MONO fill (added)
+=====================================
+
+Host batch script: sh tests/run_retro_simd_models.sh
+
+tests/overlap_mono_model.c checks the actual opt-in portable helper
+against the original pixel update and monochrome span algorithms:
+
+  - 17,408 exhaustive repeated 4x overlap correction comparisons
+  - 33,408 overlap spans with a second overlapping span
+  - 82,176 MONO full-span and masked-edge byte comparisons
+
+Native R5900 and SPARC assembly execution is NOT part of this test.
+The scalar path is unchanged when the new switches are disabled.
+
+For end-to-end regression, use the same font bytes with scalar and
+optimized FreeType builds and compare the following fingerprint modes:
+
+    ./retro-glyph-hash font.ttf overlap
+    ./retro-glyph-hash font.ttf mono
+
+The overlap mode explicitly sets FT_OUTLINE_OVERLAP on an outline.
+See docs/RETRO_OVERLAP_MONO.md for CPU-specific flags and limitations.
+
+Fixed-point multiply for R5900 and SPARC32
+==========================================
+
+The host runner now includes tests/mulfix_rounding_model.c.
+It compares FreeType's exact signed 64-bit FT_MulFix rounding against
+the target backends' shared HI:LO word-rounding routine in 1,037,663
+boundary and deterministic cases. It does NOT execute ISA assembly.
+
+Build and run tests/mulfix_freetype_compare.c against the scalar
+and target-specific FreeType builds separately; compare its full
+775,517-case fingerprint for exact public FT_MulFix output.
+
+Both FT_CONFIG_OPTION_RETRO_MULFIX_R5900 and
+FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 require a 32-bit FT_Long ABI.
+Select only the matching CPU, and inspect the compiler-generated
+MULT/MFHI/MFLO or SMUL/RD %y assembly before timing it.
+
+See docs/RETRO_MULFIX.md for assembly and ABI caveats.
+
+Most-significant bit on R5900 and SPARC32
+========================================
+
+The host batch script also compiles tests/msb_semantics_model.c.
+It checks 2,048,706 patterns against the scalar reference, including
+zero, sign bit, powers, low-16 exhaustiveness and one million random
+words.  It uses the actual De Bruijn helper, while R5900 PLZCW is
+modeled (not executed) on the host.
+
+For cross-compiled target builds, tests/msb_target_compare.c exercises
+the internal FT_MSB interface on nonzero inputs, verifying the output
+and producing a fingerprint for approximately 1.39 million inputs.
+The default builtin clz is intentionally not called with zero.
+
+FT_CONFIG_OPTION_RETRO_MSB_R5900 uses PLZCW.
+FT_CONFIG_OPTION_RETRO_MSB_SPARC32 uses portable De Bruijn arithmetic.
+Neither switch is enabled by default.  Do not select both at once.
+
+See docs/RETRO_MSB.md for ISA semantics, limits and target checks.
+
+32-bit fixed-point division and vector normalization
+====================================================
+
+Enable FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32 to select an exact
+portable C shortcut for FT_DivFix when the divisor is a power of
+two or the biased numerator fits in unsigned 32 bits.
+The shortcut falls back to the original function for zero divisor,
+oversized quotient and other conditions where the old behavior
+could differ between FT_INT64 and emulated-64-bit builds.
+
+Host batch: tests/divfix_fast32_model.c checks 1,961,233 operand
+pairs, using the actual fast-path helper and a 64-bit reference.
+
+Compare separate scalar vs optimized 32-bit FreeType builds with:
+
+  tests/divfix_freetype_compare.c       (993,225 public API cases)
+  tests/normlen_freetype_compare.c      (300,961 internal cases)
+
+The NormLen comparison needs STATIC linking against a matching
+FreeType archive and internal headers. Its arithmetic was not
+rewritten; this ensures FT_MSB backend changes do not alter the
+Newton iteration output or the reported normalized length.
+
+See docs/RETRO_DIVFIX_NORMLEN.md for configurations and caveats.
+
+32-bit fixed-point square root (FT_INT64 only)
+==============================================
+
+Enable FT_CONFIG_OPTION_RETRO_SQRT_RESTORING to replace the existing
+FT_SqrtFixed Babylonian division loop with an exact 24-step
+division-free 32-bit restoring square root. The implementation is
+portable unsigned C and works on both EE and SPARC32. It is off
+by default and has no effect in non-FT_INT64 FreeType builds.
+
+The deferred host batch now includes tests/sqrtfixed_restoring_model.c:
+1,458,915 cases compare the real restoring helper to the original
+Babylonian method and to an independent integer binary-search oracle.
+The model does not execute hardware-specific instructions.
+
+The test tests/sqrtfixed_freetype_compare.c fingerprints 512,307
+FT_SqrtFixed calls from a matching STATIC FreeType archive.
+Build baseline and optimized variants with the same 32-bit ABI
+and FT_INT64 configuration; compare whole output lines.
+
+See docs/RETRO_SQRTFIXED.md for the exact rounding invariant,
+implementation scope and later target-performance checks.
+
+Multiply-divide, outlines and BGRA grayscale conversions
+=========================================================
+
+FT_CONFIG_OPTION_RETRO_MULDIV_FAST32 selects portable 32-bit
+FT_MulDiv and FT_MulDiv_No_Round shortcuts for common factors,
+safe small numerators and power-of-two divisors. The host script
+builds tests/muldiv_fast32_model.c in two modes, with FT_INT64
+enabled and with it unavailable (3,087,312 cases each).
+An additional target test, tests/muldiv_freetype_compare.c,
+hashes 699,625 public/internal API result pairs. Link it against
+matching STATIC FreeType archives for the same 32-bit target.
+
+FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM optionally specializes
+the identity and diagonal affine transforms, general transforms
+and translation of zero/single/two coordinate axes. Link
+tests/outline_transform_freetype_compare.c (19,152 outlines)
+and tests/outline_translate_freetype_compare.c (17,024 outlines)
+separately against baseline and optimized FreeType builds.
+
+FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT builds a 3KB three-channel
+component-square lookup only for BGRA->GRAY conversions of
+at least 4096 pixels. The host runner includes the actual LUT
+helper's 100,000-row exactness model. The public API test
+tests/bgra_gray_freetype_compare.c checks 3240 conversions
+across large/small images, row padding and both pitch signs.
+
+All three switches are disabled by default and remain portable
+with NO_ASSEMBLER. Tests and hardware benchmarks are deferred.
+See docs/RETRO_MULDIV.md, docs/RETRO_OUTLINE_TRANSFORM.md and
+docs/RETRO_BGRA_GRAY.md.
+
+Adaptive MONO horizontal embolden lookup
+=======================================
+
+The option FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT uses two
+256-byte per-strength tables for large packed-MONO bitmaps.
+It retains the right-to-left byte update ordering and original
+shift/OR semantics, with a 1024-padded-byte activation threshold.
+
+The host batch now runs tests/mono_embolden_lut_model.c
+(81,024 planned rows, including strengths 1..8 and guard bytes).
+
+The target test tests/mono_embolden_lut_freetype_compare.c
+checks 5376 FT_Bitmap_Copy / FT_Bitmap_Embolden cases on both
+sides of the size threshold, both pitch signs and variable
+padding. Compare fingerprints from the same scalar/optimized
+FreeType revision. No tests were run while preparing the PR.
+
+See docs/RETRO_MONO_EMBOLDEN_LUT.md.
+
+Multi-candidate A/B/C benchmarks (OpenSSL-derived PS2 harness)
+=============================================================
+
+The new tests/retro_bench/ directory adapts the design of
+maekawa-mugi/openssl-retro:codex/ps2-ee-mmi-test/test/ps2.
+It compiles scalar and optional target kernels into the SAME binary,
+checks five full-buffer seeded cases per backend, then measures six
+alternating-order samples with output digests outside timing.
+
+The included target scripts only BUILD:
+  sh tests/retro_bench/build-host.sh
+  bash tests/retro_bench/build-ps2.sh
+  sh tests/retro_bench/build-sparc.sh
+
+After future PCSX2, EE or SPARC execution, capture all RB1 stdout
+lines and run the verdict parser on your host:
+  python3 tests/retro_bench/verdict.py console.log --json result.json --markdown result.md
+
+The parser rejects correctness failures, missing samples and
+mismatched checksums, then estimates median scalar/candidate speedup,
+90 percent paired bootstrap interval and sample jitter. It selects
+only reproducibly faster alternatives, reports ties and inconclusive
+measurements, and makes size-specific decisions for 16/64/256/512/
+4096-byte or pixel workloads. The cold-LUT workloads include table
+preparation inside timing.
+
+The standalone harness covers the actual MulDiv/DivFix/SqrtFixed/MSB,
+LCD (including LCD_V and negative pitch), BGRA blend/convert,
+MONO embolden, overlap, MMI/VIS1 bitmap OR and packed conversion,
+and EE GRAY8 embolden kernels. All hardware-specific options compile
+only on a matching target, not on the host.
+
+IMPORTANT: this is only the *first* approval gate. Public FreeType
+API output comparison, real font glyph hashes, ISA disassembly and
+real workload end-to-end timing are still required. No runs occurred
+during harness preparation.
+
+See tests/retro_bench/README.md for full matrix, clocks, timing
+boundaries, build IDs, runner commands and verdict meanings.

@@ -1,0 +1,33 @@
+#!/bin/sh
+# Host-side SIMD semantics regression. Uses no hardware-specific assembly.
+set -eu
+: "${CC:=cc}"
+: "${CFLAGS:=-O2 -Wall -Wextra}"
+test_dir=$(mktemp -d "${TMPDIR:-/tmp}/ft-retro-simd.XXXXXXXX") || exit 1
+trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
+"$CC" $CFLAGS tests/mmi_embolden_equivalence.c -o "$test_dir/retro-simd-model"
+"$test_dir/retro-simd-model"
+"$CC" $CFLAGS tests/convert_simd_model.c -o "$test_dir/retro-convert-model"
+"$test_dir/retro-convert-model"
+"$CC" $CFLAGS tests/blend_exact255_model.c -o "$test_dir/retro-blend-model"
+"$test_dir/retro-blend-model"
+"$CC" $CFLAGS tests/lcd_spans_model.c -o "$test_dir/retro-lcd-model"
+"$test_dir/retro-lcd-model"
+"$CC" $CFLAGS tests/overlap_mono_model.c -o "$test_dir/retro-overlap-mono-model"
+"$test_dir/retro-overlap-mono-model"
+"$CC" $CFLAGS tests/mulfix_rounding_model.c -o "$test_dir/retro-mulfix-model"
+"$test_dir/retro-mulfix-model"
+"$CC" $CFLAGS tests/msb_semantics_model.c -o "$test_dir/retro-msb-model"
+"$test_dir/retro-msb-model"
+"$CC" $CFLAGS tests/divfix_fast32_model.c -o "$test_dir/retro-divfix-model"
+"$test_dir/retro-divfix-model"
+"$CC" $CFLAGS tests/sqrtfixed_restoring_model.c -o "$test_dir/retro-sqrtfixed-model"
+"$test_dir/retro-sqrtfixed-model"
+"$CC" $CFLAGS tests/muldiv_fast32_model.c -o "$test_dir/retro-muldiv64-model"
+"$test_dir/retro-muldiv64-model"
+"$CC" $CFLAGS -DRETRO_MULDIV_TEST_NO_INT64 tests/muldiv_fast32_model.c -o "$test_dir/retro-muldiv32-model"
+"$test_dir/retro-muldiv32-model"
+"$CC" $CFLAGS tests/bgra_gray_lut_model.c -o "$test_dir/retro-bgra-gray-model"
+"$test_dir/retro-bgra-gray-model"
+"$CC" $CFLAGS tests/mono_embolden_lut_model.c -o "$test_dir/retro-mono-embolden-model"
+"$test_dir/retro-mono-embolden-model"
