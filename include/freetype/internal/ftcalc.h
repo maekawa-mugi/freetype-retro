@@ -221,6 +221,36 @@ FT_BEGIN_HEADER
 #endif /* FT_CONFIG_OPTION_INLINE_MULFIX */
 
 
+/* Optional exact 32x32->64 FT_MulFix backends for PS2 EE and SPARC32.
+ * Override the normal 64-bit C inline or the 32-bit default routine
+ * only when one specifically selected hardware backend is enabled.
+ * The shared assembler switch always restores the scalar FreeType
+ * implementation without changing public exported symbols.
+ */
+#if defined( FT_CONFIG_OPTION_RETRO_MULFIX_R5900 ) && \
+    defined( FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 )
+#error "Select only one retro FT_MulFix backend"
+#endif
+
+#if !defined( FT_CONFIG_OPTION_NO_ASSEMBLER ) && \
+    ( defined( FT_CONFIG_OPTION_RETRO_MULFIX_R5900 ) || \
+      defined( FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 ) )
+#include "ftmulfix_retro.h"
+
+#ifdef FT_MULFIX_ASSEMBLER
+#undef FT_MULFIX_ASSEMBLER
+#endif
+#define FT_MULFIX_ASSEMBLER  ft_mulfix_retro_hw
+
+#ifdef FT_MulFix
+#undef FT_MulFix
+#endif
+#define FT_MulFix( a, b ) \
+          ft_mulfix_retro_hw( (FT_Int32)(a), (FT_Int32)(b) )
+
+#endif /* optional retro FT_MulFix */
+
+
   /**************************************************************************
    *
    * @function:
