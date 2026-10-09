@@ -27,3 +27,5 @@ trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 "$test_dir/retro-muldiv64-model"
 "$CC" $CFLAGS -DRETRO_MULDIV_TEST_NO_INT64 tests/muldiv_fast32_model.c -o "$test_dir/retro-muldiv32-model"
 "$test_dir/retro-muldiv32-model"
+"$CC" $CFLAGS tests/bgra_gray_lut_model.c -o "$test_dir/retro-bgra-gray-model"
+"$test_dir/retro-bgra-gray-model"
