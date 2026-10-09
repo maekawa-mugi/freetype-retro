@@ -127,12 +127,16 @@ def analyze(log, min_speedup, min_lower, max_jitter):
             invalid = True
             continue
         ref = log["timings"].get((case, baseline), {})
+        ref_checks = log["checks"].get((case, baseline), [])
         for variant in sorted(cases[case]):
             key = case, variant
             checks = log["checks"].get(key, [])
             sample = log["timings"].get(key, {})
             if len(checks) != 5 or any(c[0] != "PASS" for c in checks):
                 verdict, reason = "REJECT-CORRECTNESS", "missing/failing 5 tests"
+                invalid = True
+            elif len(ref_checks) != 5 or any(x[0] != "PASS" for x in ref_checks):
+                verdict, reason = "INCOMPLETE", "invalid scalar oracle"
                 invalid = True
             elif len(sample) != SAMPLES or len(ref) != SAMPLES:
                 verdict, reason = "INCOMPLETE", "missing timing samples"
@@ -142,7 +146,7 @@ def analyze(log, min_speedup, min_lower, max_jitter):
                 verdict, reason = "REJECT-CORRECTNESS", "paired digest/reps/HZ mismatch"
                 invalid = True
             elif any(checks[i][1] !=
-                     log["checks"][(case, baseline)][i][1]
+                     ref_checks[i][1]
                      for i in range(5)):
                 verdict, reason = "REJECT-CORRECTNESS", "cross-variant check digest mismatch"
                 invalid = True
