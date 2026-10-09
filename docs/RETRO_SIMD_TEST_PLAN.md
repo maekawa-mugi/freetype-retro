@@ -26,6 +26,9 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_MSB_SPARC32` | SPARC 32-bit ABI | Optional 32-bit De Bruijn most-significant-bit index via 32-byte table |
 | `FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32` | Both (portable 32-bit C) | Exact power-of-two and bounded-numerator FT_DivFix shortcuts; original overflow fallbacks |
 | `FT_CONFIG_OPTION_RETRO_SQRT_RESTORING` | Both (portable 32-bit C, FT_INT64) | 24-step division-free unsigned restoring square root with exact nearest rounding |
+| `FT_CONFIG_OPTION_RETRO_MULDIV_FAST32` | Both (portable 32-bit C) | Rounded/unrounded multiply-divide: cancelled operands, bounded 32/32 divide and exact power-two shifts |
+| `FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM` | Both (portable C) | Identity/diagonal/generic outline transform and paired translation specializations |
+| `FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT` | Both (portable C) | Adaptive 3072-byte component-square lookup for BGRA conversions >=4096 pixels |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -72,6 +75,14 @@ covering **1,458,915 input cases** against two independently implemented
 references: the existing FT_INT64 Babylonian iteration and an exact
 integer binary-search square-root oracle. The 24-step unsigned restoring
 helper does not execute MMI/VIS1 instructions or use 64-bit division.
+
+The host batch now also runs `tests/muldiv_fast32_model.c` twice,
+with and without FT_INT64, for **3,087,312 planned cases per
+configuration**. It checks the rounded and no-round functions,
+signed operands, saturating fallback and historical unsigned
+a+b wrap cases. Also included is `tests/bgra_gray_lut_model.c`,
+which compares the actual BGRA lookup helper to original scalar
+math over 100,000 randomized rows and 1280 single-pixel patterns.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -183,6 +194,31 @@ integer loop against the compiler's Babylonian 64-bit division code.
 The switch is ignored if FT_INT64 is unavailable; the existing
 25-cycle Meessen routine stays unchanged in that build. See
 `docs/RETRO_SQRTFIXED.md`.
+
+### Multiply-divide and outline geometry
+
+Link `tests/muldiv_freetype_compare.c` against matching **static**
+FreeType builds; it fingerprints **699,625** combinations of the
+public `FT_MulDiv` and internal `FT_MulDiv_No_Round` results.
+Use the same FT_INT64 setting and ABI. See `docs/RETRO_MULDIV.md`.
+
+Compile `tests/outline_transform_freetype_compare.c` and
+`tests/outline_translate_freetype_compare.c` against baseline
+and optional outline builds. They cover **19,152** affine
+transforms and **17,024** translations, with differential
+per-point references and complete output fingerprints.
+See `docs/RETRO_OUTLINE_TRANSFORM.md`.
+
+### BGRA to GRAY adaptive table
+
+Compile `tests/bgra_gray_freetype_compare.c` against both
+FreeType libraries; it fingerprints **3240** public
+`FT_Bitmap_Convert` cases across positive and negative
+pitches, padded rows, opaque/transparent/premultiplied
+and arbitrary RGBA inputs, plus both sides of the 4096-pixel
+table-activation threshold. The 3072-byte stack lookup must
+not alter a single initialized output byte. See
+`docs/RETRO_BGRA_GRAY.md`.
 
 ## Tier C: end-to-end glyph rendering
 
