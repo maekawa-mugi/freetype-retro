@@ -53,3 +53,22 @@ Because the upstream BGRA negative-pitch path is not yet implemented,
 only positive-pitch blend API inputs are used in this test.
 
 See `docs/RETRO_BITMAP_BLEND.md`.
+
+LCD 5-tap filtering (FT_CONFIG_OPTION_SUBPIXEL_RENDERING only)
+==============================================================
+
+The host batch runner also includes tests/lcd_spans_model.c.
+It exercises 165,120 deterministic horizontal and vertical
+five-tap span cases with odd lengths, varying byte alignments,
+multiple weights/coverages, overlapping spans and both pitch signs.
+The test uses the actual portable folded implementation.
+
+FT_CONFIG_OPTION_RETRO_LCD_SPANS provides portable folding.
+FT_CONFIG_OPTION_MMI_LCD_SPANS additionally uses the R5900 PADDB
+wrapping byte-add SIMD for long spans. The MMI assembly has not
+been run by this host model and needs later target verification.
+
+For LCD glyph output comparisons, enable
+FT_CONFIG_OPTION_SUBPIXEL_RENDERING in both scalar and accelerated
+FreeType builds, then compare retro_glyph_hash lcd/lcd-v outputs.
+See docs/RETRO_LCD_SPANS.md.
