@@ -91,6 +91,21 @@ static FT_UInt rb_msb_scalar(FT_UInt32 v)
 
 #include "../../include/freetype/internal/ftmulfix_retro.h"
 
+/* Target bitmap OR and long grayscale span backends, also compared in
+ * the same executable against plain scalar C and libc memset.
+ */
+#if defined(RETRO_BENCH_R5900)
+#include "../../src/base/ftbitmap_mmi.h"
+#define FT_CONFIG_OPTION_MMI_GRAY_SPANS
+#define FT_MEM_SET(p,val,n) memset((p),(val),(n))
+#include "../../src/smooth/ftgrays_retro.h"
+#elif defined(RETRO_BENCH_SPARC32)
+#include "../../src/base/ftbitmap_vis1.h"
+#define FT_CONFIG_OPTION_VIS1_GRAY_SPANS
+#define FT_MEM_SET(p,val,n) memset((p),(val),(n))
+#include "../../src/smooth/ftgrays_retro.h"
+#endif
+
 static FT_UInt32 rb_magnitude(FT_Int32 n)
 {
   return n<0 ? 0U-(FT_UInt32)n:(FT_UInt32)n;
