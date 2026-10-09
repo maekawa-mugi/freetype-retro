@@ -1,5 +1,34 @@
 # Deferred SIMD regression and benchmark checklist
 
+## Tier 0: A/B/C correctness-gated kernel benchmark and decisions
+
+The `tests/retro_bench/` harness ports the proven *structure* of
+`openssl-retro`'s `codex/ps2-ee-mmi-test:test/ps2` A/B/F test:
+- Scalar and all supported alternatives run in the **same binary**,
+  with identical seeded buffers and repetitions.
+- Five complete correctness/guard comparisons run **before** timing.
+  Six alternating-order samples follow, with digests computed outside
+  the timed interval. A mismatch blocks all later timing.
+- The host `verdict.py` consumes PS2/PCSX2 or UltraSPARC logs, producing
+  Markdown and JSON with per-size median, paired CI and noise.
+- An alternative must clear >=1.05x median speedup, >1.02x 90% CI lower
+  bound and <=12% timing MAD before it becomes a potential winner.
+  The output explicitly distinguishes REJECT-CORRECTNESS, REJECT-SLOW,
+  TIE, INCONCLUSIVE and SELECT.
+- Scalar, builtin, De Bruijn, HI/LO, LCD folded/MMI, exact/LUT blend,
+  BGRA square-LUT, MONO LUT, bitmap OR, grayscale fill,
+  MMI/VIS1 packed conversions and optional EE GRAY8 embolden are
+  compared by architecture and input size. LCD_V includes negative pitch.
+- LUT cold-setup tests and steady-state tests are separate, preventing
+  amortized table setup from being mistaken for an advantage on tiny
+  glyphs.
+
+See **`tests/retro_bench/README.md`** for build-only host,
+PS2SDK and SPARC32 commands plus sample capture/analysis recipes.
+This tier does **not** replace the public FreeType API, glyph hash
+and end-to-end application tests below. Never turn on a feature
+based only on an isolated microbenchmark result.
+
 The optional SIMD switches are **disabled by default**.  Turn them on
 only for a matching target/toolchain, and compare output to an unmodified
 scalar build of the same FreeType source revision.
