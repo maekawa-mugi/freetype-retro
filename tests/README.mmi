@@ -213,3 +213,22 @@ All three switches are disabled by default and remain portable
 with NO_ASSEMBLER. Tests and hardware benchmarks are deferred.
 See docs/RETRO_MULDIV.md, docs/RETRO_OUTLINE_TRANSFORM.md and
 docs/RETRO_BGRA_GRAY.md.
+
+Adaptive MONO horizontal embolden lookup
+=======================================
+
+The option FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT uses two
+256-byte per-strength tables for large packed-MONO bitmaps.
+It retains the right-to-left byte update ordering and original
+shift/OR semantics, with a 1024-padded-byte activation threshold.
+
+The host batch now runs tests/mono_embolden_lut_model.c
+(81,024 planned rows, including strengths 1..8 and guard bytes).
+
+The target test tests/mono_embolden_lut_freetype_compare.c
+checks 5376 FT_Bitmap_Copy / FT_Bitmap_Embolden cases on both
+sides of the size threshold, both pitch signs and variable
+padding. Compare fingerprints from the same scalar/optimized
+FreeType revision. No tests were run while preparing the PR.
+
+See docs/RETRO_MONO_EMBOLDEN_LUT.md.
