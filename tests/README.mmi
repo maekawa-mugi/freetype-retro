@@ -182,3 +182,34 @@ and FT_INT64 configuration; compare whole output lines.
 
 See docs/RETRO_SQRTFIXED.md for the exact rounding invariant,
 implementation scope and later target-performance checks.
+
+Multiply-divide, outlines and BGRA grayscale conversions
+=========================================================
+
+FT_CONFIG_OPTION_RETRO_MULDIV_FAST32 selects portable 32-bit
+FT_MulDiv and FT_MulDiv_No_Round shortcuts for common factors,
+safe small numerators and power-of-two divisors. The host script
+builds tests/muldiv_fast32_model.c in two modes, with FT_INT64
+enabled and with it unavailable (3,087,312 cases each).
+An additional target test, tests/muldiv_freetype_compare.c,
+hashes 699,625 public/internal API result pairs. Link it against
+matching STATIC FreeType archives for the same 32-bit target.
+
+FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM optionally specializes
+the identity and diagonal affine transforms, general transforms
+and translation of zero/single/two coordinate axes. Link
+tests/outline_transform_freetype_compare.c (19,152 outlines)
+and tests/outline_translate_freetype_compare.c (17,024 outlines)
+separately against baseline and optimized FreeType builds.
+
+FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT builds a 3KB three-channel
+component-square lookup only for BGRA->GRAY conversions of
+at least 4096 pixels. The host runner includes the actual LUT
+helper's 100,000-row exactness model. The public API test
+tests/bgra_gray_freetype_compare.c checks 3240 conversions
+across large/small images, row padding and both pitch signs.
+
+All three switches are disabled by default and remain portable
+with NO_ASSEMBLER. Tests and hardware benchmarks are deferred.
+See docs/RETRO_MULDIV.md, docs/RETRO_OUTLINE_TRANSFORM.md and
+docs/RETRO_BGRA_GRAY.md.
