@@ -24,6 +24,7 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32` | SPARC 32-bit ABI | SMUL, RD %y and exact FreeType fixed-point rounding |
 | `FT_CONFIG_OPTION_RETRO_MSB_R5900` | PS2 R5900 | Optional PLZCW unsigned MSB mapping, guarding bit31 and zero |
 | `FT_CONFIG_OPTION_RETRO_MSB_SPARC32` | SPARC 32-bit ABI | Optional 32-bit De Bruijn most-significant-bit index via 32-byte table |
+| `FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32` | Both (portable 32-bit C) | Exact power-of-two and bounded-numerator FT_DivFix shortcuts; original overflow fallbacks |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -59,6 +60,11 @@ The runner additionally includes `tests/msb_semantics_model.c`. It
 compares the real SPARC32 De Bruijn helper and an EE PLZCW word model
 to a portable 32-bit reference across 2,048,706 input patterns. This
 model does not execute the R5900 instruction.
+
+The new `tests/divfix_fast32_model.c` checks the actual exact 32-bit
+shortcut helper against the original mathematical quotient and guards
+both legacy fallback behaviors. It covers 1,961,233 signed/power-of-two,
+rounding and overflow scenarios, including division by zero.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -139,6 +145,24 @@ the 32-bit SPARC path uses a De Bruijn table, not VIS1 floating-point
 instructions.  Both alternatives must beat the already optimized GCC
 builtin expansion on real hardware to justify merging.  See
 `docs/RETRO_MSB.md`.
+
+### Exact FT_DivFix fast32 and vector normalization
+
+Compare `tests/divfix_freetype_compare.c` output fingerprints between
+scalar and optimized FreeType builds for 993,225 input pairs including
+division by zero, signed boundaries, power-of-two divisors and cases
+that must fall back to the original quotient logic.
+
+Compare `tests/normlen_freetype_compare.c` for 300,961 inputs: it hashes
+the **actual internal** `FT_Vector_NormLen` return length and both
+modified vector components. This program requires a **static FreeType
+archive** and matching internal headers. The Newton iteration itself
+has not been changed; its FT_MSB dependency can use the earlier
+optional backend. See `docs/RETRO_DIVFIX_NORMLEN.md`.
+
+Both builds must use the same **32-bit ABI** and the same `FT_INT64`
+configuration. The portable `RETRO_DIVFIX_FAST32` option remains
+available when `NO_ASSEMBLER` is set.
 
 ## Tier C: end-to-end glyph rendering
 
