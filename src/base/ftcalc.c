@@ -38,6 +38,10 @@
 #include <freetype/internal/ftdebug.h>
 #include <freetype/internal/ftobjs.h>
 
+#ifdef FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32
+#include "ftdivfix_retro.h"
+#endif
+
   /* cancel inlining macro from internal/ftcalc.h */
 #ifdef FT_MulFix
 #  undef FT_MulFix
@@ -246,6 +250,20 @@
 
     FT_MOVE_SIGN( FT_UInt64, a_, a, s );
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
+
+#ifdef FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32
+    {
+      FT_UInt32  fast_q;
+
+
+      if ( ft_divfix_retro_fast32( (FT_UInt32)a, (FT_UInt32)b,
+                                   &fast_q ) )
+      {
+        q_ = (FT_Long)fast_q;
+        return s < 0 ? NEG_LONG( q_ ) : q_;
+      }
+    }
+#endif
 
     q = b > 0 ? ( ( a << 16 ) + ( b >> 1 ) ) / b
               : 0x7FFFFFFFUL;
@@ -589,6 +607,19 @@
 
     FT_MOVE_SIGN( FT_UInt32, a_, a, s );
     FT_MOVE_SIGN( FT_UInt32, b_, b, s );
+
+#ifdef FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32
+    {
+      FT_UInt32  fast_q;
+
+
+      if ( ft_divfix_retro_fast32( a, b, &fast_q ) )
+      {
+        q_ = (FT_Long)fast_q;
+        return s < 0 ? NEG_LONG( q_ ) : q_;
+      }
+    }
+#endif
 
     if ( b == 0 )
     {
