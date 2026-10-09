@@ -46,6 +46,12 @@
 #include "ftbitmap_convert_vis1.h"
 #endif
 
+#if defined( FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 ) || \
+    defined( FT_CONFIG_OPTION_RETRO_BLEND_LUT )
+#define FT_BITMAP_RETRO_BLEND_ENABLED
+#include "ftbitmap_blend_retro.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -1050,11 +1056,32 @@
       unsigned char*  limit_p =
         p + source->pitch * (int)source->rows;
 
+#ifdef FT_CONFIG_OPTION_RETRO_BLEND_LUT
+      FT_Retro_Blend_LUT  lut;
+      FT_Bool             use_lut;
+
+
+      /* Do not spend a 256-entry setup pass on small glyphs. */
+      use_lut = color.alpha != 0 &&
+                (FT_ULong)source->width * source->rows >= 2048UL;
+      if ( use_lut )
+        ft_bitmap_retro_blend_prepare( &lut, color );
+#endif
 
       while ( p < limit_p )
       {
-        unsigned char*  r       = p;
-        unsigned char*  s       = q;
+        unsigned char*  r = p;
+        unsigned char*  s = q;
+
+
+#ifdef FT_BITMAP_RETRO_BLEND_ENABLED
+#ifdef FT_CONFIG_OPTION_RETRO_BLEND_LUT
+        if ( use_lut )
+          ft_bitmap_retro_blend_row_lut( s, r, source->width, &lut );
+        else
+#endif
+          ft_bitmap_retro_blend_row( s, r, source->width, color );
+#else
         unsigned char*  limit_r = r + source->width;
 
 
@@ -1080,6 +1107,7 @@
           *s++ = (unsigned char)( br * ba2 / 255 + fr );
           *s++ = (unsigned char)( ba * ba2 / 255 + fa );
         }
+#endif /* FT_BITMAP_RETRO_BLEND_ENABLED */
 
         p += source->pitch;
         q += target->pitch;
