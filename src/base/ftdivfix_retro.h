@@ -31,10 +31,11 @@
  * existing division-by-zero sentinel.  Return 0 when the original
  * FreeType division routine should be used instead.
  *
- * q is intentionally only 32 bits.  The original FT_DivFix casts its
- * quotient to FT_Long (32 bits) before applying the sign, so even
- * cases with an oversized mathematical quotient keep their low 32
- * bits.  All arithmetic here uses unsigned 32-bit values.
+ * q is intentionally only 32 bits, and the shortcut is selected
+ * only when the mathematical quotient fits the full 32-bit unsigned
+ * range.  The FT_INT64 and non-FT_INT64 baseline implementations
+ * differ for larger quotients, so those cases MUST use the original
+ * path.  All arithmetic here uses unsigned 32-bit values.
  */
 static FT_Bool
 ft_divfix_retro_fast32( FT_UInt32   a,
@@ -55,6 +56,18 @@ ft_divfix_retro_fast32( FT_UInt32   a,
   if ( !( b & ( b - 1U ) ) )
   {
     k = (FT_UInt32)FT_MSB( b );
+
+    /* On builds without FT_INT64, FreeType's long-division routine
+     * returns 0x7FFFFFFF if the unsigned quotient exceeds 32 bits.
+     * The FT_INT64 branch instead keeps the low 32 bits.  To retain
+     * BOTH established behaviors, decline this fast path whenever
+     * the full unsigned quotient cannot fit in 32 bits.
+     *
+     * For k<=15 the quotient is exactly a << (16-k), and the
+     * overflow condition is a >= 2^(k+16) = b << 16.
+     */
+    if ( k <= 15 && a >= ( b << 16 ) )
+      return 0;
 
     if ( k <= 16 )
       *q = a << ( 16 - k );
