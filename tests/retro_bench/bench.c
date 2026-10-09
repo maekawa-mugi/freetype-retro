@@ -40,7 +40,7 @@ static FT_Retro_BGRA_Gray_Table gray_table;
 static FT_Retro_Mono_Embolden_Table mono_table;
 static volatile FT_UInt32 escape_sink;
 
-enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,BLEND,BLEND_COLD,
+enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_COLD,
        BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
        PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8 };
 struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
@@ -54,6 +54,11 @@ static const struct rb_case cases[] = {
   {"lcd-16",LCD,16,320},
   {"lcd-256",LCD,256,160},
   {"lcd-4096",LCD,4096,24},
+  {"lcdv-16",LCD_V,16,320},
+  {"lcdv-256",LCD_V,256,160},
+  {"lcdv-4096",LCD_V,4096,24},
+  {"lcdv-neg-256",LCD_V_NEG,256,160},
+  {"lcdv-neg-4096",LCD_V_NEG,4096,24},
   {"blend-16",BLEND,16,200},
   {"blend-512",BLEND,512,36},
   {"blend-4096",BLEND,4096,10},
@@ -149,7 +154,7 @@ static const char* label(int kind,unsigned v)
   case OVERLAP:
     if(v==0)return "scalar";if(v==1)return "option_c";
     break;
-  case LCD:
+  case LCD:case LCD_V:case LCD_V_NEG:
     if(v==0)return "scalar";if(v==1)return "folded_c";
 #if defined(RETRO_BENCH_R5900)
     if(v==2)return "mmi_paddb";
@@ -197,7 +202,7 @@ static unsigned variants(int kind)
 #else
     return 2;
 #endif
-  if(kind==LCD)
+  if(kind==LCD||kind==LCD_V||kind==LCD_V_NEG)
 #if defined(RETRO_BENCH_R5900)
     return 3;
 #else
@@ -266,6 +271,17 @@ static void lcd_original(FT_Byte* dst,unsigned width,unsigned char cover,
     for(k=0;k<5;k++)
       dst[i+k]=(FT_Byte)(dst[i+k]+
                 (((unsigned)cover*weights[k]+85U)>>8));
+}
+static void lcd_v_original(FT_Byte* dst,unsigned width,unsigned char cover,
+                           const unsigned char weights[5],int pitch)
+{
+  unsigned i,k;
+  for(k=0;k<5;k++){
+    unsigned delta=((unsigned)cover*weights[k]+85U)>>8;
+    for(i=0;i<width;i++)
+      dst[i]=(FT_Byte)(dst[i]+delta);
+    dst+=pitch;
+  }
 }
 static void blend_original(FT_Byte* dst,const FT_Byte* mask,unsigned width,
                            FT_Color color)
@@ -381,6 +397,21 @@ static void kernel(const struct rb_case* t,unsigned v)
       rb_lcd_mmi_horizontal(output+16+n/3,n/2,221,weights);
     }
 #endif
+    break;
+  case LCD_V:case LCD_V_NEG:
+    {
+      int pitch=(int)n+8;
+      FT_Byte* dst=output+16;
+      if(kind==LCD_V_NEG){
+        dst+=4*pitch;
+        pitch=-pitch;
+      }
+      if(v==0)lcd_v_original(dst,n,197,weights,pitch);
+      else if(v==1)rb_lcd_c_vertical(dst,n,197,weights,pitch);
+#if defined(RETRO_BENCH_R5900)
+      else rb_lcd_mmi_vertical(dst,n,197,weights,pitch);
+#endif
+    }
     break;
   case BLEND:case BLEND_COLD:
     if(v==2 && kind==BLEND_COLD)
