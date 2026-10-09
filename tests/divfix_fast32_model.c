@@ -56,8 +56,10 @@ check(int32_t sa,int32_t sb)
   int has_fast,should_fast;
 
   has_fast=ft_divfix_retro_fast32(a,b,&q);
-  should_fast=(b!=0 && (!(b&(b-1U)) ||
-               a<=65535U-(b>>17)));
+  should_fast=(b!=0 &&
+               ( ( !(b&(b-1U)) &&
+                   ( b>=65536U || a<(b<<16) ) ) ||
+                 ( a<=65535U-(b>>17) ) ) );
 
   if(has_fast!=should_fast)
   {
@@ -110,6 +112,21 @@ main(void)
   for(i=0;i<sizeof(special)/sizeof(special[0]);i++)
     for(j=0;j<sizeof(special)/sizeof(special[0]);j++)
       check(special[i],special[j]);
+
+  /* Explicitly keep the oversized quotient in the original path:
+   * a=32768, b=1 yields an unsigned quotient of 0x80000000;
+   * a=65536, b=1 yields 0x100000000 and must NOT use the shortcut.
+   * The two baseline FT_INT64 configurations handle oversized
+   * quotients differently, so no global shortcut may rewrite them.
+   */
+  check(32768,1);
+  check(65535,1);
+  check(65536,1);
+  check(INT32_MIN,1);
+  check(INT32_MIN,-1);
+  check(65536,2);
+  check(131072,2);
+  check(INT32_MIN,32768);
 
   for(bit=0;bit<32;bit++)
   {
