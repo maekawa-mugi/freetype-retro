@@ -216,6 +216,32 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional exact integer optimization of FT_Bitmap_Blend.  Replaces
+   * division by 255 in BGRA color composition with an equivalent shift
+   * and add expression, and skips zero-coverage pixels.  This is normal
+   * portable integer C and can be used on both SPARC and PS2, even with
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.  Disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 */
+
+
+  /**************************************************************************
+   *
+   * Optional 256-entry coverage lookup table for FT_Bitmap_Blend.
+   * For masks of at least 2048 pixels, prepares 1280 bytes of premultiplied
+   * source colors and inverse alpha values once per blend call, to avoid
+   * repeated source-color multiplications per pixel.  Smaller bitmaps
+   * use the exact scalar path instead.  This option also enables the
+   * exact integer division-by-255 replacement above, without requiring
+   * FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 separately.
+   *
+   * On memory-constrained targets, enable this only after profiling.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_LUT */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
