@@ -39,6 +39,16 @@ static FT_Retro_Blend_LUT blend_table;
 static FT_Retro_BGRA_Gray_Table gray_table;
 static FT_Retro_Mono_Embolden_Table mono_table;
 static volatile FT_UInt32 escape_sink;
+/* A real per-call lookup table build is part of COLD timing.
+ * Volatile function pointers prevent whole-loop hoisting by the
+ * compiler without changing the computation performed by the helper.
+ */
+static void (*volatile cold_blend_prepare)(FT_Retro_Blend_LUT*,FT_Color)
+    = ft_bitmap_retro_blend_prepare;
+static void (*volatile cold_gray_prepare)(FT_Retro_BGRA_Gray_Table*)
+    = ft_bitmap_retro_bgra_gray_prepare;
+static void (*volatile cold_mono_prepare)(FT_Retro_Mono_Embolden_Table*,FT_UInt)
+    = ft_bitmap_retro_mono_embolden_prepare;
 
 enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_COLD,
        BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
@@ -423,20 +433,20 @@ static void kernel(const struct rb_case* t,unsigned v)
     break;
   case BLEND:case BLEND_COLD:
     if(v==2 && kind==BLEND_COLD)
-      ft_bitmap_retro_blend_prepare(&blend_table,color);
+      cold_blend_prepare(&blend_table,color);
     if(v==0)blend_original(output+16,input,n,color);
     else if(v==1)ft_bitmap_retro_blend_row(output+16,input,n,color);
     else ft_bitmap_retro_blend_row_lut(output+16,input,n,&blend_table);
     break;
   case BGRA:case BGRA_COLD:
     if(v && kind==BGRA_COLD)
-      ft_bitmap_retro_bgra_gray_prepare(&gray_table);
+      cold_gray_prepare(&gray_table);
     if(v==0)bgra_original(output+16,input,n);
     else ft_bitmap_retro_bgra_gray_row(output+16,input,n,&gray_table);
     break;
   case MONO:case MONO_COLD:
     if(v && kind==MONO_COLD)
-      ft_bitmap_retro_mono_embolden_prepare(&mono_table,4);
+      cold_mono_prepare(&mono_table,4);
     if(v==0)mono_original(output+16,n);
     else ft_bitmap_retro_mono_embolden_row(output+16,(int)n,&mono_table);
     break;
