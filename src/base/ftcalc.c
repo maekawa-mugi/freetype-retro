@@ -42,6 +42,10 @@
 #include "ftdivfix_retro.h"
 #endif
 
+#ifdef FT_CONFIG_OPTION_RETRO_MULDIV_FAST32
+#include "ftmuldiv_retro.h"
+#endif
+
 #if defined( FT_CONFIG_OPTION_RETRO_SQRT_RESTORING ) && \
     defined( FT_INT64 )
 #include "ftsqrtrestro.h"
@@ -181,6 +185,20 @@
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
     FT_MOVE_SIGN( FT_UInt64, c_, c, s );
 
+#ifdef FT_CONFIG_OPTION_RETRO_MULDIV_FAST32
+    {
+      FT_UInt32  quick;
+
+
+      if ( ft_muldiv_retro_fast32( (FT_UInt32)a, (FT_UInt32)b,
+                                   (FT_UInt32)c, 1, &quick ) )
+      {
+        d_ = (FT_Long)quick;
+        return s < 0 ? NEG_LONG( d_ ) : d_;
+      }
+    }
+#endif
+
     d = c > 0 ? ( a * b + ( c >> 1 ) ) / c
               : 0x7FFFFFFFUL;
 
@@ -205,6 +223,20 @@
     FT_MOVE_SIGN( FT_UInt64, a_, a, s );
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
     FT_MOVE_SIGN( FT_UInt64, c_, c, s );
+
+#ifdef FT_CONFIG_OPTION_RETRO_MULDIV_FAST32
+    {
+      FT_UInt32  quick;
+
+
+      if ( ft_muldiv_retro_fast32( (FT_UInt32)a, (FT_UInt32)b,
+                                   (FT_UInt32)c, 0, &quick ) )
+      {
+        d_ = (FT_Long)quick;
+        return s < 0 ? NEG_LONG( d_ ) : d_;
+      }
+    }
+#endif
 
     d = c > 0 ? a * b / c
               : 0x7FFFFFFFUL;
@@ -433,6 +465,19 @@
     FT_MOVE_SIGN( FT_UInt32, b_, b, s );
     FT_MOVE_SIGN( FT_UInt32, c_, c, s );
 
+#ifdef FT_CONFIG_OPTION_RETRO_MULDIV_FAST32
+    {
+      FT_UInt32  quick;
+
+
+      if ( ft_muldiv_retro_fast32( a, b, c, 1, &quick ) )
+      {
+        a_ = (FT_Long)quick;
+        return s < 0 ? NEG_LONG( a_ ) : a_;
+      }
+    }
+#endif
+
     if ( c == 0 )
       a = 0x7FFFFFFFUL;
 
@@ -476,6 +521,19 @@
     FT_MOVE_SIGN( FT_UInt32, a_, a, s );
     FT_MOVE_SIGN( FT_UInt32, b_, b, s );
     FT_MOVE_SIGN( FT_UInt32, c_, c, s );
+
+#ifdef FT_CONFIG_OPTION_RETRO_MULDIV_FAST32
+    {
+      FT_UInt32  quick;
+
+
+      if ( ft_muldiv_retro_fast32( a, b, c, 0, &quick ) )
+      {
+        a_ = (FT_Long)quick;
+        return s < 0 ? NEG_LONG( a_ ) : a_;
+      }
+    }
+#endif
 
     if ( c == 0 )
       a = 0x7FFFFFFFUL;
