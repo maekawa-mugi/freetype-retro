@@ -382,6 +382,24 @@ FT_BEGIN_HEADER
    */
 /* #define FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32 */
 
+  /**************************************************************************
+   *
+   * Optional division-free FT_SqrtFixed for 32-bit PS2 EE, SPARC32,
+   * and other 32-bit FT_Long platforms that have FT_INT64 enabled.
+   *
+   * Uses a 24-step binary restoring square root on the 48-bit logical
+   * value (unsigned 32-bit input << 16).  All intermediate arithmetic
+   * uses unsigned 32-bit integers.  Rounds to the nearest integer by
+   * checking the final remainder, matching the FT_INT64 Babylonian
+   * result without invoking 64-bit division.
+   *
+   * Disabled by default.  Ignored when FT_INT64 is unavailable, since
+   * FreeType already has a division-free fallback for large inputs in
+   * that configuration.  FT_CONFIG_OPTION_NO_ASSEMBLER does not disable
+   * this portable C option.  Benchmark before enabling on real targets.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_SQRT_RESTORING */
+
 
   /**************************************************************************
    *
