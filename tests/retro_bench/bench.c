@@ -129,6 +129,10 @@ static const struct rb_case cases[] = {
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
 
+/* The screen summary uses the variant names declared further down.
+ * C99 requires an explicit declaration before the first call. */
+static const char* label(int kind,unsigned v);
+
 #if defined(RETRO_BENCH_R5900)
 /*
  * PS2SDK's GS debug screen is independent of printf/PCSX2 stdout.
