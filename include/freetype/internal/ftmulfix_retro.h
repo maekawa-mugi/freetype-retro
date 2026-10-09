@@ -85,8 +85,9 @@ ft_mulfix_retro_hw( FT_Int32  a,
 
 #elif defined( FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 )
 
-#if !defined( __sparc__ ) || !defined( __GNUC__ ) || defined( __arch64__ ) || \
-    defined( __sparc_v9__ ) && defined( __LP64__ )
+#if !defined( __sparc__ ) || !defined( __GNUC__ ) || \
+    defined( __arch64__ ) || \
+    ( defined( __sparc_v9__ ) && defined( __LP64__ ) )
 #error "VIS1-class FT_MulFix requires a GCC-compatible 32-bit SPARC ABI"
 #endif
 
