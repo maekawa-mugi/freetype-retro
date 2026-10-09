@@ -72,3 +72,27 @@ For LCD glyph output comparisons, enable
 FT_CONFIG_OPTION_SUBPIXEL_RENDERING in both scalar and accelerated
 FreeType builds, then compare retro_glyph_hash lcd/lcd-v outputs.
 See docs/RETRO_LCD_SPANS.md.
+
+4x overlap and long MONO fill (added)
+=====================================
+
+Host batch script: sh tests/run_retro_simd_models.sh
+
+tests/overlap_mono_model.c checks the actual opt-in portable helper
+against the original pixel update and monochrome span algorithms:
+
+  - 17,408 exhaustive 4x overlap carry/rollover identities
+  - 33,408 overlap spans with a second overlapping span
+  - 82,176 MONO full-span and masked-edge byte comparisons
+
+Native R5900 and SPARC assembly execution is NOT part of this test.
+The scalar path is unchanged when the new switches are disabled.
+
+For end-to-end regression, use the same font bytes with scalar and
+optimized FreeType builds and compare the following fingerprint modes:
+
+    ./retro-glyph-hash font.ttf overlap
+    ./retro-glyph-hash font.ttf mono
+
+The overlap mode explicitly sets FT_OUTLINE_OVERLAP on an outline.
+See docs/RETRO_OVERLAP_MONO.md for CPU-specific flags and limitations.
