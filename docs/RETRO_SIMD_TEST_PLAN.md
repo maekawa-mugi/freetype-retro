@@ -29,6 +29,7 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_MULDIV_FAST32` | Both (portable 32-bit C) | Rounded/unrounded multiply-divide: cancelled operands, bounded 32/32 divide and exact power-two shifts |
 | `FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM` | Both (portable C) | Identity/diagonal/generic outline transform and paired translation specializations |
 | `FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT` | Both (portable C) | Adaptive 3072-byte component-square lookup for BGRA conversions >=4096 pixels |
+| `FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT` | Both (portable C) | Two 256-byte right-to-left packed-MONO dilation tables for >=1024-byte bitmaps |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -83,6 +84,11 @@ signed operands, saturating fallback and historical unsigned
 a+b wrap cases. Also included is `tests/bgra_gray_lut_model.c`,
 which compares the actual BGRA lookup helper to original scalar
 math over 100,000 randomized rows and 1280 single-pixel patterns.
+
+Also included is `tests/mono_embolden_lut_model.c`, which compares
+the actual 512-byte lookup implementation to the original descending
+byte/bit shift algorithm for 81,024 planned rows across strengths
+1..8, odd lengths, and byte alignment/guard variations.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -219,6 +225,17 @@ and arbitrary RGBA inputs, plus both sides of the 4096-pixel
 table-activation threshold. The 3072-byte stack lookup must
 not alter a single initialized output byte. See
 `docs/RETRO_BGRA_GRAY.md`.
+
+### Packed MONO horizontal embolden lookup
+
+Compile `tests/mono_embolden_lut_freetype_compare.c` against
+the baseline and optimized libraries. It fingerprints **5376**
+`FT_Bitmap_Embolden` cases with strengths 2..8, small and large
+widths, row padding and both pitch signs. Some bitmaps exceed the
+1024-padded-byte adaptive activation threshold. No output
+difference is permitted; profile table setup versus the original
+shift/OR loop on the target processor.
+See `docs/RETRO_MONO_EMBOLDEN_LUT.md`.
 
 ## Tier C: end-to-end glyph rendering
 
