@@ -34,7 +34,17 @@
 #define RB_OUT_SIZE (RB_MAX*4U+128U)
 
 static FT_UInt32 a[RB_ITEMS],b[RB_ITEMS],c[RB_ITEMS],result[RB_ITEMS];
-static FT_Byte input[RB_OUT_SIZE],initial[RB_OUT_SIZE],output[RB_OUT_SIZE];
+#if defined(__GNUC__)
+#define RB_ALIGNED __attribute__((aligned(16)))
+#else
+#define RB_ALIGNED
+#endif
+static FT_Byte input[RB_OUT_SIZE] RB_ALIGNED;
+static FT_Byte initial[RB_OUT_SIZE] RB_ALIGNED;
+static FT_Byte output[RB_OUT_SIZE] RB_ALIGNED;
+/* Benchmark use is aligned; pre-timer correctness also exercises
+ * offsets 17..20, which trigger target prefix/tail scalar fallbacks. */
+static unsigned rb_offset=16U;
 static FT_Retro_Blend_LUT blend_table;
 static FT_Retro_BGRA_Gray_Table gray_table;
 static FT_Retro_Mono_Embolden_Table mono_table;
@@ -418,23 +428,23 @@ static void kernel(const struct rb_case* t,unsigned v)
     /* Three overlapping synthetic spans, identical coverage for each
      * implementation, including the extra right-side 4-tap border. */
     if(v==0) {
-      lcd_original(output+16,n,143,weights);
-      lcd_original(output+16+n/3,n/2,221,weights);
+      lcd_original(output+rb_offset,n,143,weights);
+      lcd_original(output+rb_offset+n/3,n/2,221,weights);
     } else if(v==1) {
-      rb_lcd_c_horizontal(output+16,n,143,weights);
-      rb_lcd_c_horizontal(output+16+n/3,n/2,221,weights);
+      rb_lcd_c_horizontal(output+rb_offset,n,143,weights);
+      rb_lcd_c_horizontal(output+rb_offset+n/3,n/2,221,weights);
     }
 #if defined(RETRO_BENCH_R5900)
     else {
-      rb_lcd_mmi_horizontal(output+16,n,143,weights);
-      rb_lcd_mmi_horizontal(output+16+n/3,n/2,221,weights);
+      rb_lcd_mmi_horizontal(output+rb_offset,n,143,weights);
+      rb_lcd_mmi_horizontal(output+rb_offset+n/3,n/2,221,weights);
     }
 #endif
     break;
   case LCD_V:case LCD_V_NEG:
     {
       int pitch=(int)n+8;
-      FT_Byte* dst=output+16;
+      FT_Byte* dst=output+rb_offset;
       if(kind==LCD_V_NEG){
         dst+=4*pitch;
         pitch=-pitch;
@@ -449,69 +459,69 @@ static void kernel(const struct rb_case* t,unsigned v)
   case BLEND:case BLEND_COLD:
     if(v==2 && kind==BLEND_COLD)
       cold_blend_prepare(&blend_table,color);
-    if(v==0)blend_original(output+16,input,n,color);
-    else if(v==1)ft_bitmap_retro_blend_row(output+16,input,n,color);
-    else ft_bitmap_retro_blend_row_lut(output+16,input,n,&blend_table);
+    if(v==0)blend_original(output+rb_offset,input,n,color);
+    else if(v==1)ft_bitmap_retro_blend_row(output+rb_offset,input,n,color);
+    else ft_bitmap_retro_blend_row_lut(output+rb_offset,input,n,&blend_table);
     break;
   case BGRA:case BGRA_COLD:
     if(v && kind==BGRA_COLD)
       cold_gray_prepare(&gray_table);
-    if(v==0)bgra_original(output+16,input,n);
-    else ft_bitmap_retro_bgra_gray_row(output+16,input,n,&gray_table);
+    if(v==0)bgra_original(output+rb_offset,input,n);
+    else ft_bitmap_retro_bgra_gray_row(output+rb_offset,input,n,&gray_table);
     break;
   case MONO:case MONO_COLD:
     if(v && kind==MONO_COLD)
       cold_mono_prepare(&mono_table,4);
-    if(v==0)mono_original(output+16,n);
-    else ft_bitmap_retro_mono_embolden_row(output+16,(int)n,&mono_table);
+    if(v==0)mono_original(output+rb_offset,n);
+    else ft_bitmap_retro_mono_embolden_row(output+rb_offset,(int)n,&mono_table);
     break;
   case OVERLAP:
     for(i=0;i<3;i++){
       unsigned x=16U+i*3U;
       unsigned cover=i==0?255U:i==1?193U:121U;
-      if(v==0)overlap_original(output+16,x,n*2U,cover);
-      else ft_smooth_retro_overlap_span(output+16,x,n*2U,cover);
+      if(v==0)overlap_original(output+rb_offset,x,n*2U,cover);
+      else ft_smooth_retro_overlap_span(output+rb_offset,x,n*2U,cover);
     } break;
   case GRAYFILL:
-    if(v==0)for(i=0;i<n;i++)output[16+i]=179;
-    else if(v==1)memset(output+16,179,n);
+    if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=179;
+    else if(v==1)memset(output+rb_offset,179,n);
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
-    else ft_gray_retro_fill(output+16,179,(int)n);
+    else ft_gray_retro_fill(output+rb_offset,179,(int)n);
 #endif
     break;
   case ROW_OR:
-    if(v<2)for(i=0;i<n;i++)output[16+i]|=input[16+i];
+    if(v<2)for(i=0;i<n;i++)output[rb_offset+i]|=input[rb_offset+i];
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_or_row(output+16,input+16,(FT_Int)n);
+    else ft_bitmap_mmi_or_row(output+rb_offset,input+rb_offset,(FT_Int)n);
 #elif defined(RETRO_BENCH_SPARC32)
-    else ft_bitmap_vis1_or_row(output+16,input+16,(FT_Int)n);
+    else ft_bitmap_vis1_or_row(output+rb_offset,input+rb_offset,(FT_Int)n);
 #endif
     break;
   case PACK_MONO:
-    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
-      (input[16+(i>>3)]>>(7-(i&7U)))&1U);
+    if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
+      (input[rb_offset+(i>>3)]>>(7-(i&7U)))&1U);
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_convert_mono_row(input+16,output+16,n);
+    else ft_bitmap_mmi_convert_mono_row(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
-    else ft_bitmap_vis1_convert_mono_row(input+16,output+16,n);
+    else ft_bitmap_vis1_convert_mono_row(input+rb_offset,output+rb_offset,n);
 #endif
     break;
   case PACK_GRAY2:
-    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
-      (input[16+(i>>2)]>>(6-2*(i&3U)))&3U);
+    if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
+      (input[rb_offset+(i>>2)]>>(6-2*(i&3U)))&3U);
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_convert_gray2_row(input+16,output+16,n);
+    else ft_bitmap_mmi_convert_gray2_row(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
-    else ft_bitmap_vis1_convert_gray2_row(input+16,output+16,n);
+    else ft_bitmap_vis1_convert_gray2_row(input+rb_offset,output+rb_offset,n);
 #endif
     break;
   case PACK_GRAY4:
-    if(v==0)for(i=0;i<n;i++)output[16+i]=(FT_Byte)(
-      (input[16+(i>>1)]>>(4-4*(i&1U)))&15U);
+    if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
+      (input[rb_offset+(i>>1)]>>(4-4*(i&1U)))&15U);
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_convert_gray4_row(input+16,output+16,n);
+    else ft_bitmap_mmi_convert_gray4_row(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
-    else ft_bitmap_vis1_convert_gray4_row(input+16,output+16,n);
+    else ft_bitmap_vis1_convert_gray4_row(input+rb_offset,output+rb_offset,n);
 #endif
     break;
   case EMBOLDEN_GRAY8:case EMBOLDEN_GRAY8_X2:
@@ -525,14 +535,14 @@ static void kernel(const struct rb_case* t,unsigned v)
         for(x=(int)n-1;x>=0;x--){
           unsigned i;
           for(i=1;i<=strength && x>=(int)i;i++){
-            unsigned sum=(unsigned)output[16+x]+output[16+x-i];
-            output[16+x]=(FT_Byte)(sum>255U?255U:sum);
+            unsigned sum=(unsigned)output[rb_offset+x]+output[rb_offset+x-i];
+            output[rb_offset+x]=(FT_Byte)(sum>255U?255U:sum);
             if(sum>=255U)break;
           }
         }
       }
 #if defined(RETRO_BENCH_R5900)
-      else ft_bitmap_mmi_gray8_embolden_small(output+16,(FT_Int)n,
+      else ft_bitmap_mmi_gray8_embolden_small(output+rb_offset,(FT_Int)n,
                                                (FT_Int)strength);
 #endif
     }
@@ -551,7 +561,7 @@ static int run(const struct rb_case* t,unsigned v,unsigned reps)
   for(r=0;r<reps;r++){
     kernel(t,v);
     escape_sink+=(t->kind<LCD)?result[(r*7U)%t->size]:
-                         output[16U+(r*7U)%t->size];
+                         output[rb_offset+(r*7U)%t->size];
   }
   return 1;
 }
@@ -562,6 +572,7 @@ static int validate_case(const struct rb_case* t)
   FT_UInt32 ref[RB_ITEMS];
   unsigned expected,got;
   for(trial=0;trial<5;trial++){
+    rb_offset=16U+trial;
     prepare(t,UINT32_C(0x6f234c91)+(unsigned)trial*101U);
     if(!run(t,0,1))return 0;
     expected=digest(t);
@@ -609,6 +620,7 @@ int main(void)
     }
   printf("RB1,GATE,PASS,%u\n",nc);
   fflush(stdout);
+  rb_offset=16U; /* force aligned timing on real VIS1/MMI targets */
   for(j=0;j<nc;j++){
     t=&cases[j];
     n=variants(t->kind);
