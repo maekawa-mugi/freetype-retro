@@ -240,6 +240,21 @@ static unsigned target_bytes(const struct rb_case* t)
   default: return RB_OUT_SIZE;
   }
 }
+/* Every mutable-workload candidate pays the same reset overhead,
+ * but reset ONLY the region the kernel can touch. Otherwise a 16-byte
+ * microbench would measure a 32K memcpy rather than its arithmetic.
+ * The untouched guard suffix is initialized once per sample.
+ */
+static unsigned reset_bytes(const struct rb_case* t)
+{
+  const unsigned n=t->size;
+  switch(t->kind){
+  case LCD:return n*2U+64U;
+  case LCD_V:case LCD_V_NEG:return n*5U+64U;
+  case BLEND:case BLEND_COLD:return n*4U+64U;
+  default:return n+64U;
+  }
+}
 static void prepare(const struct rb_case* t,unsigned run_seed)
 {
   uint32_t st=UINT32_C(0x73bd519b)^run_seed;
@@ -355,7 +370,7 @@ static void kernel(const struct rb_case* t,unsigned v)
   FT_Color color={83,177,221,197};
   static const unsigned char weights[5]={8,77,86,77,8};
   if(kind>=LCD){
-    memcpy(output,initial,RB_OUT_SIZE); /* identical reset per operation */
+    memcpy(output,initial,reset_bytes(t)); /* identical touched-byte reset */
   }
 
   switch(kind){
