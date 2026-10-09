@@ -13,33 +13,48 @@
 #ifndef FTSMOOTH_RETRO_OVERLAP_H_
 #define FTSMOOTH_RETRO_OVERLAP_H_
 
-/* Original overlap raster accumulation for a single destination pixel.
- * The correction is intentionally NOT a generic saturating add: at
- * sums above 256 it wraps modulo 256 after subtracting one.
+/* FreeType's exact per-sample correction, including its final 8-bit
+ * write.  A source contribution of one to a byte of 255 produces 255:
+ * (255+1) - ((255+1)>>8) = 255.
  */
 static FT_Byte
 ft_smooth_retro_overlap_add( FT_Byte  pixel,
-                             FT_UInt  total )
+                             FT_UInt  cover )
 {
-  FT_UInt  sum = (FT_UInt)pixel + total;
+  FT_UInt  sum = (FT_UInt)pixel + cover;
 
 
   return (FT_Byte)( sum - ( sum >> 8 ) );
 }
 
 
-/* Each 4 neighbouring source samples uses the SAME span coverage, and
- * all four contribute to the SAME destination byte.  Each source
- * sample adds cover = (coverage+8)/16 in the original rasterizer.
+/* Group up to four repeated contributions by reading the output byte
+ * once and writing it once.  The correction must be evaluated AFTER
+ * EACH sample, not once on the combined sum.  For example, applying
+ * cover=1 twice to pixel=255 yields 255 both times, whereas a combined
+ * cover=2 would yield 0.  Exact semantics matter more than a faster
+ * but non-equivalent clamped or wrapping vector addition.
+ */
+static FT_Byte
+ft_smooth_retro_overlap_repeat( FT_Byte  pixel,
+                                FT_UInt  cover,
+                                FT_UInt  count )
+{
+  while ( count-- )
+    pixel = ft_smooth_retro_overlap_add( pixel, cover );
+
+  return pixel;
+}
+
+
+/* Each four adjacent samples from an FT_Span use the same coverage
+ * and destination byte.  Only the subpixel index computation and the
+ * destination memory traffic are grouped; the exact sample-level
+ * arithmetic is retained, including the update order.
  *
- * For 1..4 updates with 0<=cover<=16, at most one 256 boundary is
- * crossed, so applying the correction once to (pixel+cover*count)
- * matches applying it after EACH source sample, for all 256 possible
- * destination values.  Never use a saturating SIMD add here.
- *
- * The x coordinate is explicitly unsigned-short, matching the original
- * (unsigned short)spans->x cast.  The caller is responsible for valid
- * pixel bounds; this routine never reads past a mapped destination.
+ * This routine matches FreeType's (unsigned short)spans->x conversion,
+ * has no architecture-specific dependencies, and leaves pitch/row
+ * traversal to the existing renderer.
  */
 static void
 ft_smooth_retro_overlap_span( FT_Byte*  dst,
@@ -62,8 +77,8 @@ ft_smooth_retro_overlap_span( FT_Byte*  dst,
 
   if ( first )
   {
-    dst[pixel] = ft_smooth_retro_overlap_add( dst[pixel],
-                                               first * cover );
+    dst[pixel] = ft_smooth_retro_overlap_repeat( dst[pixel],
+                                                 cover, first );
     pixel++;
     length -= first;
   }
@@ -71,15 +86,15 @@ ft_smooth_retro_overlap_span( FT_Byte*  dst,
   groups = length >> 2;
   for ( i = 0; i < groups; i++ )
   {
-    dst[pixel] = ft_smooth_retro_overlap_add( dst[pixel],
-                                             4U * cover );
+    dst[pixel] = ft_smooth_retro_overlap_repeat( dst[pixel],
+                                                 cover, 4 );
     pixel++;
   }
 
   length &= 3U;
   if ( length )
-    dst[pixel] = ft_smooth_retro_overlap_add( dst[pixel],
-                                             length * cover );
+    dst[pixel] = ft_smooth_retro_overlap_repeat( dst[pixel],
+                                                 cover, length );
 }
 
 #endif /* FTSMOOTH_RETRO_OVERLAP_H_ */
