@@ -12,7 +12,6 @@ This program runs only on the *host* after collecting logs.
 import argparse
 import csv
 import json
-import math
 import random
 import statistics
 import sys
@@ -46,76 +45,158 @@ def median_abs_dev(v):
     return statistics.median(abs(x - m) for x in v)
 
 def parse_file(path):
+    """Read a complete RB1 run; fail closed on lost/duplicate suites.
+
+    The CASE manifest is emitted ahead of any CHECK lines. It lists
+    the exact expected suite names, variants and repetitions for this
+    platform. This avoids a false SELECT from a truncated console
+    capture that loses an entire suite (not just a SAMPLE line).
+    """
+    manifest = {}
     checks = defaultdict(list)
     timings = defaultdict(dict)
     meta = None
-    gate = False
-    done = False
+    gate_count = None
+    done_count = None
+    phase = "initial"
     failures = []
+
     with Path(path).open("r", encoding="utf8", errors="replace") as handle:
         for line_no, line in enumerate(handle, 1):
             if not line.startswith("RB1,"):
                 continue
             try:
                 row = next(csv.reader([line]))
+                if len(row) < 2:
+                    raise ValueError("missing RB1 operation")
                 op = row[1]
+
                 if op == "META":
-                    if len(row) != 6 or meta is not None:
-                        raise ValueError("duplicate/bad META")
+                    if len(row) != 6 or phase != "initial":
+                        raise ValueError("duplicate/out-of-order/bad META")
                     target, build, nsamples, hz = row[2:]
-                    if int(nsamples) != SAMPLES or int(hz) <= 0:
+                    if not target or not build or int(nsamples) != SAMPLES or int(hz) <= 0:
                         raise ValueError("unexpected sampling metadata")
                     meta = {"target": target, "build": build,
                             "samples": int(nsamples), "hz": int(hz)}
+                    phase = "manifest"
+
+                elif op == "CASE":
+                    if phase != "manifest" or len(row) < 7:
+                        raise ValueError("out-of-order/bad CASE manifest")
+                    _, _, case, reps, size, *names = row
+                    if not case or case in manifest:
+                        raise ValueError("empty/duplicate case name")
+                    reps, size = int(reps), int(size)
+                    if reps <= 0 or size <= 0:
+                        raise ValueError("nonpositive case reps or size")
+                    if any(not n for n in names) or len(set(names)) != len(names):
+                        raise ValueError("empty/duplicate variant names")
+                    if "scalar" not in names and "scalar_loop" not in names:
+                        raise ValueError("CASE has no correctness oracle")
+                    manifest[case] = {"reps": reps, "size": size,
+                                      "variants": tuple(names)}
+
                 elif op == "CHECK":
-                    if len(row) != 6:
-                        raise ValueError("bad CHECK")
+                    if phase not in ("manifest", "checks") or len(row) != 6:
+                        raise ValueError("out-of-order/bad CHECK")
+                    if not manifest:
+                        raise ValueError("CHECK without CASE manifest")
                     _, _, case, variant, status, digest = row
+                    if case not in manifest or variant not in manifest[case]["variants"]:
+                        raise ValueError("CHECK not declared in CASE manifest")
                     if status not in ("PASS", "FAIL"):
                         raise ValueError("unknown CHECK result")
-                    int(digest, 16)
-                    checks[(case, variant)].append((status, digest))
+                    phase = "checks"
+                    normalized = f"{int(digest, 16):08x}"
+                    checks[(case, variant)].append((status, normalized))
                     if status != "PASS":
                         failures.append(f"{case}/{variant}: correctness FAIL")
-                elif op == "SAMPLE":
-                    if len(row) != 9:
-                        raise ValueError("bad SAMPLE")
-                    _, _, case, variant, index, reps, ticks, hz, digest = row
-                    index, reps, ticks, hz = map(int, (index, reps, ticks, hz))
-                    if index < 0 or index >= SAMPLES or reps <= 0 or ticks <= 0:
-                        raise ValueError("nonpositive or out-of-range sample")
-                    if meta and hz != meta["hz"]:
-                        raise ValueError("timer frequency changed")
-                    int(digest, 16)
-                    key = case, variant
-                    if index in timings[key]:
-                        raise ValueError("duplicate sample")
-                    timings[key][index] = (ticks, reps, hz, digest)
+
                 elif op == "GATE":
-                    gate = row[2] == "PASS"
-                    if not gate:
-                        failures.append("global correctness gate failed")
+                    if phase != "checks" or len(row) != 4 or gate_count is not None:
+                        raise ValueError("duplicate/out-of-order/bad GATE")
+                    if row[2] != "PASS":
+                        raise ValueError("global correctness gate failed")
+                    gate_count = int(row[3])
+                    if gate_count != len(manifest):
+                        raise ValueError("GATE count does not match CASE manifest")
+                    phase = "samples"
+
+                elif op == "SAMPLE":
+                    if phase != "samples" or len(row) != 9:
+                        raise ValueError("out-of-order/bad SAMPLE")
+                    _, _, case, variant, index, reps, ticks, hz, digest = row
+                    if case not in manifest or variant not in manifest[case]["variants"]:
+                        raise ValueError("SAMPLE not declared in CASE manifest")
+                    index, reps, ticks, hz = map(int, (index, reps, ticks, hz))
+                    if index < 0 or index >= SAMPLES or ticks <= 0:
+                        raise ValueError("nonpositive/out-of-range sample")
+                    if reps != manifest[case]["reps"]:
+                        raise ValueError("SAMPLE repetition count differs from CASE")
+                    if hz != meta["hz"]:
+                        raise ValueError("timer frequency changed")
+                    normalized = f"{int(digest, 16):08x}"
+                    key = (case, variant)
+                    if index in timings[key]:
+                        raise ValueError("duplicate sample index")
+                    timings[key][index] = (ticks, reps, hz, normalized)
+
                 elif op == "DONE":
-                    done = row[2] == "PASS"
-                    if not done:
-                        failures.append("benchmark terminated without PASS")
+                    if phase != "samples" or len(row) != 4 or done_count is not None:
+                        raise ValueError("duplicate/out-of-order/bad DONE")
+                    if row[2] != "PASS":
+                        raise ValueError("benchmark completion status is not PASS")
+                    done_count = int(row[3])
+                    if done_count != len(manifest) or done_count != gate_count:
+                        raise ValueError("DONE/GATE counts differ from CASE manifest")
+                    phase = "done"
+
                 elif op == "FATAL":
                     failures.append("target fatal: " + ",".join(row[2:]))
+
+                else:
+                    raise ValueError(f"unknown RB1 operation: {op}")
+
             except (ValueError, IndexError) as exc:
                 failures.append(f"{path}:{line_no}: {exc}")
+
     if meta is None:
         failures.append("missing META line")
-    if not gate or not done:
+    if not manifest:
+        failures.append("missing CASE manifest (old logs need new ELF)")
+    if gate_count is None or done_count is None or phase != "done":
         failures.append("missing successful GATE/DONE (partial or aborted log)")
-    return {"file": str(path), "meta": meta,
+
+    expected = {(case, variant)
+                for case, desc in manifest.items()
+                for variant in desc["variants"]}
+    if set(checks) != expected:
+        missing = sorted(expected - set(checks))
+        extra = sorted(set(checks) - expected)
+        failures.append(f"incomplete CHECK manifest: missing={missing} extra={extra}")
+    if set(timings) != expected:
+        missing = sorted(expected - set(timings))
+        extra = sorted(set(timings) - expected)
+        failures.append(f"incomplete SAMPLE manifest: missing={missing} extra={extra}")
+    for key in sorted(expected):
+        if len(checks.get(key, ())) != 5:
+            failures.append(f"{key}: expected 5 CHECK trials")
+        if set(timings.get(key, {})) != set(range(SAMPLES)):
+            failures.append(f"{key}: expected exactly {SAMPLES} SAMPLE indices")
+    return {"file": str(path), "meta": meta, "manifest": manifest,
             "checks": checks, "timings": timings, "failures": failures}
 
 def analyze(log, min_speedup, min_lower, max_jitter):
     cases = defaultdict(set)
-    for (case, variant) in set(log["checks"]) | set(log["timings"]):
+    for (case, variant) in (set(log["checks"]) | set(log["timings"]) |
+                            {(case, v)
+                             for case, desc in log.get("manifest", {}).items()
+                             for v in desc["variants"]}):
         cases[case].add(variant)
     rows = []
     invalid = bool(log["failures"])
+    baselines = {}
     for case in sorted(cases):
         # The true deployed baseline matters more than a deliberately
         # slow reference loop: FreeType defaults to builtin-clz on GCC
@@ -133,6 +214,7 @@ def analyze(log, min_speedup, min_lower, max_jitter):
                              verdict="INCOMPLETE", reason="no scalar reference"))
             invalid = True
             continue
+        baselines[case] = baseline
         ref = log["timings"].get((case, baseline), {})
         ref_checks = log["checks"].get((case, baseline), [])
         for variant in sorted(cases[case]):
@@ -201,9 +283,10 @@ def analyze(log, min_speedup, min_lower, max_jitter):
         if invalid:
             choices[case] = "BLOCKED (incomplete or invalid log)"
         elif not ready:
+            baseline_for_case = baselines.get(case)
             choices[case] = "KEEP " + (
-                "BUILTIN" if baseline == "builtin" else
-                "MEMSET" if baseline == "memset" else "SCALAR"
+                "BUILTIN" if baseline_for_case == "builtin" else
+                "MEMSET" if baseline_for_case == "memset" else "SCALAR"
             ) + " (no proven winner)"
         elif len(ready) > 1 and (
             ready[0]["ci90_low"] <= ready[1]["ci90_high"] * 1.02
