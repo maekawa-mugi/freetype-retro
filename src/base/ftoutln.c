@@ -551,12 +551,53 @@
 
     vec = outline->points;
 
+#ifdef FT_CONFIG_OPTION_RETRO_OUTLINE_TRANSFORM
+    /* Translating by zero is the identity.  For a one-axis shift
+     * avoid the unused addition and memory write on every point. */
+    if ( !xOffset && !yOffset )
+      return;
+
+    if ( !xOffset )
+    {
+      for ( n = 0; n < outline->n_points; n++, vec++ )
+        vec->y = ADD_LONG( vec->y, yOffset );
+
+      return;
+    }
+
+    if ( !yOffset )
+    {
+      for ( n = 0; n < outline->n_points; n++, vec++ )
+        vec->x = ADD_LONG( vec->x, xOffset );
+
+      return;
+    }
+
+    /* A pair of FT_Vector structures contains four FT_Pos values.
+     * Keep original unsigned-wrap ADD_LONG semantics for all of them.
+     * No alignment or additional instruction set is required. */
+    n = 0;
+    for ( ; n + 1 < outline->n_points; n += 2, vec += 2 )
+    {
+      vec[0].x = ADD_LONG( vec[0].x, xOffset );
+      vec[0].y = ADD_LONG( vec[0].y, yOffset );
+      vec[1].x = ADD_LONG( vec[1].x, xOffset );
+      vec[1].y = ADD_LONG( vec[1].y, yOffset );
+    }
+
+    if ( n < outline->n_points )
+    {
+      vec->x = ADD_LONG( vec->x, xOffset );
+      vec->y = ADD_LONG( vec->y, yOffset );
+    }
+#else
     for ( n = 0; n < outline->n_points; n++ )
     {
       vec->x = ADD_LONG( vec->x, xOffset );
       vec->y = ADD_LONG( vec->y, yOffset );
       vec++;
     }
+#endif
   }
 
 
