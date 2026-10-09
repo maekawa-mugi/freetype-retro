@@ -18,6 +18,7 @@
 #if defined(RETRO_BENCH_R5900)
 #include <kernel.h>
 #include <timer.h>
+#include <debug.h>  /* PS2SDK GS debug screen: init_scr/scr_printf */
 #define RB_TARGET "r5900"
 #elif defined(RETRO_BENCH_SPARC32)
 #define RB_TARGET "sparc32"
@@ -127,6 +128,204 @@ static const struct rb_case cases[] = {
 #endif
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
+
+#if defined(RETRO_BENCH_R5900)
+/*
+ * PS2SDK's GS debug screen is independent of printf/PCSX2 stdout.
+ * Keep all rendering OUTSIDE timed regions.  This screen is a brief
+ * provisional summary; only verdict.py has the full paired bootstrap
+ * correctness/noise criterion for production decisions.
+ *
+ * There are eighteen category lines (rows 3..20) plus a status/footer.
+ * The largest or last available suite of each group is shown; ALL
+ * individual input sizes and raw sample counts remain in RB1 logs.
+ */
+#define RB_SCREEN_GROUPS 18U
+#define RB_WHITE 0x00ffffff
+#define RB_GREEN 0x0000ff00
+#define RB_RED   0x000000ff
+#define RB_YELLOW 0x0000ffff
+
+struct rb_screen_entry {
+  const char* sample;
+  const char* candidate;
+  unsigned ratio_percent;
+  int present;
+};
+static struct rb_screen_entry rb_screen_results[RB_SCREEN_GROUPS];
+static const char* const rb_screen_names[RB_SCREEN_GROUPS]={
+  "MSB", "MulFix", "DivFix", "MulDiv", "MulDiv NR",
+  "SqrtFixed", "LCD H", "LCD V", "BGRA Blend",
+  "BGRA Gray", "MONO Emb", "Overlap", "GRAY Fill",
+  "Bitmap OR", "Pack MONO", "Pack GRAY2",
+  "Pack GRAY4", "GRAY8 Emb"
+};
+static unsigned rb_screen_completed;
+
+/* All returns are literal group indices, never user data. */
+static unsigned rb_screen_group(int kind)
+{
+  switch(kind){
+  case MSB: return 0;
+  case MULFIX: return 1;
+  case DIVFIX: return 2;
+  case MULDIV: return 3;
+  case MULDIV_NO: return 4;
+  case SQRT: return 5;
+  case LCD: return 6;
+  case LCD_V:case LCD_V_NEG: return 7;
+  case BLEND:case BLEND_COLD: return 8;
+  case BGRA:case BGRA_COLD: return 9;
+  case MONO:case MONO_COLD: return 10;
+  case OVERLAP:return 11;
+  case GRAYFILL:return 12;
+  case ROW_OR:return 13;
+  case PACK_MONO:return 14;
+  case PACK_GRAY2:return 15;
+  case PACK_GRAY4:return 16;
+  case EMBOLDEN_GRAY8:case EMBOLDEN_GRAY8_X2:
+  case EMBOLDEN_GRAY8_X3:case EMBOLDEN_GRAY8_X4:return 17;
+  }
+  return RB_SCREEN_GROUPS;
+}
+static uint64_t rb_screen_median6(const uint64_t data[RB_SAMPLES])
+{
+  uint64_t tmp[RB_SAMPLES], v;
+  unsigned i,j;
+
+  for(i=0;i<RB_SAMPLES;i++)tmp[i]=data[i];
+  for(i=1;i<RB_SAMPLES;i++){
+    v=tmp[i];j=i;
+    while(j>0 && tmp[j-1]>v){tmp[j]=tmp[j-1];j--;}
+    tmp[j]=v;
+  }
+  return tmp[RB_SAMPLES/2-1]+
+         (tmp[RB_SAMPLES/2]-tmp[RB_SAMPLES/2-1])/2;
+}
+static void rb_screen_start(void)
+{
+  init_scr(); /* initializes the GS framebuffer/display */
+  scr_setfontcolor(RB_WHITE);
+  scr_setXY(0,0);
+  scr_printf("FreeType RETRO | PS2 R5900 MMI\n");
+  scr_printf("Scalar / A / B / MMI  SAME ELF\n");
+  scr_printf("==========================================\n");
+  scr_setXY(0,4);
+  scr_printf("Correctness tests starting: %u suites\n",nc);
+  scr_setXY(0,6);
+  scr_printf("Do not stop the ELF before RESULT appears.\n");
+}
+static void rb_screen_progress(const char* phase,unsigned done,
+                               const char* name)
+{
+  scr_setfontcolor(RB_WHITE);
+  scr_setXY(0,4);
+  scr_printf("%-8s %2u/%2u  %-24.24s      ",
+             phase,done,nc,name);
+}
+/* Used for all exits on PS2, successful and unsuccessful.
+ * SleepThread() intentionally never resumes without an interrupt.
+ */
+static int rb_screen_hold(int status,const char* phase,const char* name)
+{
+  scr_setXY(0,22);
+  scr_setfontcolor(status?RB_RED:RB_GREEN);
+  scr_printf("%s  %-15.15s %-21.21s",
+             status?"RESULT: FAIL":"RESULT: PASS",phase,name);
+  scr_setfontcolor(RB_WHITE);
+  scr_setXY(0,23);
+  scr_printf("Console log has full per-size details.");
+  scr_setXY(0,24);
+  scr_printf("Display held: PS2SDK SleepThread().");
+  fflush(stdout);
+  SleepThread();
+  return status; /* unlikely to return */
+}
+static void rb_screen_record(const struct rb_case* t,
+                              const uint64_t samples[4][RB_SAMPLES],
+                              unsigned nvariants)
+{
+  unsigned g=rb_screen_group(t->kind),base=0,v,best=0;
+  uint64_t med[4],baseline;
+  unsigned percent;
+  struct rb_screen_entry* dst;
+  if(g>=RB_SCREEN_GROUPS)return;
+
+  /* This is the representative largest normal-size case. Cold LUT
+   * timings are still fully recorded, but do not replace it here. */
+  if(t->kind==BLEND_COLD || t->kind==BGRA_COLD ||
+     t->kind==MONO_COLD)return;
+
+  if(t->kind==MSB && nvariants>1)base=1; /* FreeType builtin clz */
+  if(t->kind==GRAYFILL && nvariants>1)base=1; /* libc memset */
+  for(v=0;v<nvariants;v++)med[v]=rb_screen_median6(samples[v]);
+  baseline=med[base];
+  best=base;
+  for(v=0;v<nvariants;v++){
+    if(v==base || !med[v])continue;
+    if(t->kind==MSB && v==0)continue; /* diagnostic bit scan */
+    if(t->kind==MULFIX && v==1)continue; /* model, not MMI */
+    if(t->kind==GRAYFILL && v==0)continue; /* diagnostic loop */
+    if(t->kind==ROW_OR && v==1)continue; /* duplicate scalar control */
+    if(med[v]<med[best])best=v;
+  }
+  percent=med[best]? (unsigned)((baseline*100U)/med[best]):100U;
+  dst=&rb_screen_results[g];
+  dst->present=1;
+  dst->sample=t->name;
+  /* A 5% gain is an on-screen provisional label ONLY. */
+  dst->candidate=(best!=base && percent>=105U)?
+                     label(t->kind,best):label(t->kind,base);
+  dst->ratio_percent=(best!=base && percent>=105U)?percent:100U;
+}
+static void rb_screen_results_page(void)
+{
+  unsigned i,shown=0;
+  init_scr(); /* clear progress screen and initialize final results */
+  scr_setfontcolor(RB_WHITE);
+  scr_setXY(0,0);
+  scr_printf("FREETYPE RETRO - PS2 EE RESULTS\n");
+  scr_printf("CORRECTNESS: PASS   %u SUITES   6 SAMPLES\n",nc);
+  scr_printf("TYPE            PROVISIONAL BEST  SPEED\n");
+  for(i=0;i<RB_SCREEN_GROUPS;i++){
+    const struct rb_screen_entry* x=&rb_screen_results[i];
+    scr_setXY(0,(int)i+3);
+    if(!x->present){
+      scr_setfontcolor(RB_YELLOW);
+      scr_printf("%-15.15s --",rb_screen_names[i]);
+      continue;
+    }
+    shown++;
+    scr_setfontcolor(x->ratio_percent>100U?RB_GREEN:RB_WHITE);
+    scr_printf("%-15.15s %-16.16s %3u.%02ux",
+               rb_screen_names[i],x->candidate,
+               x->ratio_percent/100U,x->ratio_percent%100U);
+  }
+  scr_setXY(0,21);
+  scr_setfontcolor(RB_YELLOW);
+  scr_printf("Shown: %u/%u groups  (largest cases)",shown,RB_SCREEN_GROUPS);
+  scr_setXY(0,22);
+  scr_setfontcolor(RB_GREEN);
+  scr_printf("RESULT: PASS - correctness and timings");
+  scr_setXY(0,23);
+  scr_setfontcolor(RB_WHITE);
+  scr_printf("These winners are PROVISIONAL only.");
+  scr_setXY(0,24);
+  scr_printf("Full verdict: collect RB1 logs on PC");
+}
+#else
+static void rb_screen_start(void) { }
+static void rb_screen_progress(const char* phase,unsigned done,
+                               const char* name)
+{ (void)phase;(void)done;(void)name; }
+static int rb_screen_hold(int status,const char* phase,const char* name)
+{ (void)phase;(void)name;return status; }
+static void rb_screen_record(const struct rb_case* t,
+                              const uint64_t samples[4][RB_SAMPLES],
+                              unsigned nvariants)
+{ (void)t;(void)samples;(void)nvariants; }
+static void rb_screen_results_page(void) { }
+#endif
 
 static uint32_t prng(uint32_t* state)
 {
