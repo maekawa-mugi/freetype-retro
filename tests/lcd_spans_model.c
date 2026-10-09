@@ -115,6 +115,35 @@ run(unsigned len, unsigned offset, unsigned scenario,
   ++cases;
 }
 
+/*
+ * Tight five-row allocation: both orientations use the boundary row
+ * as the first tap, with no sixth row available beyond the last tap.
+ * The optimized helper must not advance dst after its final write.
+ */
+static void
+run_tight_vertical(unsigned len, unsigned negative)
+{
+  FT_Byte a[5*80], b[5*80];
+  FT_Byte w[5] = { 8, 77, 86, 77, 8 };
+  FT_Byte* ref;
+  FT_Byte* opt;
+  int pitch = negative ? -80 : 80;
+  unsigned i;
+
+  for (i=0;i<sizeof(a);++i)
+    a[i]=(FT_Byte)random32();
+  memcpy(b,a,sizeof(a));
+  ref = a + (negative ? 4*80 : 0);
+  opt = b + (negative ? 4*80 : 0);
+  ref_vertical(ref,len,pitch,197,w);
+  ft_smooth_retro_lcd_vertical(opt,len,197,w,pitch);
+  if (memcmp(a,b,sizeof(a))) {
+    fprintf(stderr,"FAIL tight LCD_V len=%u negative=%u\n",len,negative);
+    exit(1);
+  }
+  ++cases;
+}
+
 int
 main(void)
 {
@@ -127,6 +156,11 @@ main(void)
         for(cover=0;cover<5;cover++)
           for(pitch=0;pitch<2;pitch++)
             run(len,off,scenario,cover,pitch);
+
+  /* Five rows exactly; no unused sixth-row pointer is permitted. */
+  for(len=0;len<=80;len++)
+    for(pitch=0;pitch<2;pitch++)
+      run_tight_vertical(len,(unsigned)pitch);
 
   printf("PASS LCD five-tap folded span equivalence: %lu cases\n",cases);
   return 0;
