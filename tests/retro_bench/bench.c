@@ -178,6 +178,8 @@ struct rb_screen_entry {
   int present;
 };
 static struct rb_screen_entry rb_screen_results[RB_SCREEN_GROUPS];
+/* 4096-pixel WARM LUT placement summary: RAM LUT / SPR LUT. */
+static unsigned rb_spr_pct[3], rb_spr_seen[3];
 static const char* const rb_screen_names[RB_SCREEN_GROUPS]={
   "MSB", "MulFix", "DivFix", "MulDiv", "MulDiv NR",
   "SqrtFixed", "LCD H", "LCD V", "BGRA Blend",
@@ -264,9 +266,16 @@ static int rb_screen_hold(int status,const char* phase,const char* name)
              status?"RESULT: FAIL":"RESULT: PASS",phase,name);
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,23);
-  scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
+  if(!status && rb_spr_seen[0] && rb_spr_seen[1])
+    scr_printf("SPR LUT RAM/SPR  Gray:%u.%02ux  Blend:%u.%02ux       ",
+               rb_spr_pct[0]/100,rb_spr_pct[0]%100,
+               rb_spr_pct[1]/100,rb_spr_pct[1]%100);
+  else scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
   scr_setXY(0,24);
-  scr_printf("COMPLETE | results retained on screen");
+  if(!status && rb_spr_seen[2])
+    scr_printf("SPR MONO RAM/SPR %u.%02ux | complete RB1 log required   ",
+               rb_spr_pct[2]/100,rb_spr_pct[2]%100);
+  else scr_printf("COMPLETE | results retained on screen");
   fflush(stdout);
   SleepThread();
   return status; /* unlikely to return */
@@ -279,6 +288,19 @@ static void rb_screen_record(const struct rb_case* t,
   uint64_t med[4],baseline;
   unsigned percent;
   struct rb_screen_entry* dst;
+  /* Retain a three-family 4096-pixel SPR summary for screenshot-only
+   * measurements. Log all warm/cold sizes via RB1 as before. */
+  if(t->size==4096U &&
+      (t->kind==BGRA_SPR || t->kind==BLEND_SPR || t->kind==MONO_SPR)){
+    unsigned i=t->kind==BGRA_SPR?0U:t->kind==BLEND_SPR?1U:2U;
+    unsigned ram=t->kind==BLEND_SPR?2U:1U;
+    unsigned spr=nvariants-1U;
+    uint64_t a=rb_screen_median6(samples[ram]);
+    uint64_t b=rb_screen_median6(samples[spr]);
+    rb_spr_pct[i]=b?(unsigned)(a*100U/b):0U;
+    rb_spr_seen[i]=1;
+    return;
+  }
   if(g>=RB_SCREEN_GROUPS)return;
 
   /* This is the representative largest normal-size case. Cold LUT
