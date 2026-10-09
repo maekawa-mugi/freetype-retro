@@ -16,8 +16,9 @@ fi
 }
 out=${1:-"$root/build-retro-bench/retro-bench-ps2.elf"}
 mkdir -p "$(dirname "$out")"
+build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
 "$cc" -O2 -std=c99 -march=r5900 -G0 -D_EE -DRETRO_BENCH_R5900 \
-  '-DRETRO_BENCH_BUILD_ID="ps2-r5900-retro"' \
+  "-DRETRO_BENCH_BUILD_ID=\"ps2-r5900-$build_id\"" \
   -ffunction-sections -fdata-sections \
   -I"$PS2SDK/ee/include" -I"$PS2SDK/common/include" \
   "$root/tests/retro_bench/bench.c" \
