@@ -117,7 +117,14 @@ def analyze(log, min_speedup, min_lower, max_jitter):
     rows = []
     invalid = bool(log["failures"])
     for case in sorted(cases):
-        if "scalar" in cases[case]:
+        # The true deployed baseline matters more than a deliberately
+        # slow reference loop: FreeType defaults to builtin-clz on GCC
+        # and to libc memset for sufficiently long GRAY spans.
+        if case.startswith("msb-") and "builtin" in cases[case]:
+            baseline = "builtin"
+        elif case.startswith("grayfill-") and "memset" in cases[case]:
+            baseline = "memset"
+        elif "scalar" in cases[case]:
             baseline = "scalar"
         elif "scalar_loop" in cases[case]:
             baseline = "scalar_loop"
@@ -158,6 +165,10 @@ def analyze(log, min_speedup, min_lower, max_jitter):
                 jitter = median_abs_dev(timing) / statistics.median(timing)
                 if variant == baseline:
                     verdict, reason = "BASELINE", "-"
+                elif (variant in ("hi_lo_words", "portable_loop") or
+                      (case.startswith("msb-") and variant == "scalar") or
+                      (case.startswith("grayfill-") and variant == "scalar_loop")):
+                    verdict, reason = "CONTROL", "diagnostic, not selectable flag"
                 elif jitter > max_jitter:
                     verdict, reason = "INCONCLUSIVE", "unstable timing"
                 elif speedup >= min_speedup and lo > min_lower:
@@ -190,7 +201,10 @@ def analyze(log, min_speedup, min_lower, max_jitter):
         if invalid:
             choices[case] = "BLOCKED (incomplete or invalid log)"
         elif not ready:
-            choices[case] = "KEEP SCALAR (no proven winner)"
+            choices[case] = "KEEP " + (
+                "BUILTIN" if baseline == "builtin" else
+                "MEMSET" if baseline == "memset" else "SCALAR"
+            ) + " (no proven winner)"
         elif len(ready) > 1 and (
             ready[0]["ci90_low"] <= ready[1]["ci90_high"] * 1.02
         ):
