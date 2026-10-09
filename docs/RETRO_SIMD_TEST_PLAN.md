@@ -14,6 +14,8 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_VIS1_BITMAP_CONVERT` | SPARC VIS1 | MONO/GRAY2/GRAY4 8-pixel conversion with FPMERGE |
 | `FT_CONFIG_OPTION_RETRO_BLEND_EXACT255` | Both (portable C) | Exact BGRA integer /255 + transparent pixel skip |
 | `FT_CONFIG_OPTION_RETRO_BLEND_LUT` | Both (portable C) | Adaptive premultiplied color/alpha LUT for >=2048-pixel masks |
+| `FT_CONFIG_OPTION_RETRO_LCD_SPANS` | Both (portable C) | Exact five-tap LCD folding into constant-increment horizontal/vertical spans |
+| `FT_CONFIG_OPTION_MMI_LCD_SPANS` | PS2 R5900 | 16-byte PADDB wrapping additions for long LCD span increments, plus portable folding |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables these paths.  A standalone
 `ftgrays.c` build remains scalar.  The 64-byte span threshold is an
@@ -29,6 +31,10 @@ The command also runs `tests/convert_simd_model.c` for 197,376
 packed conversion format, width and address-alignment combinations.
 It now also runs `tests/blend_exact255_model.c` to check all 65,026
 integer-division numerators and 35,840 differential BGRA row cases.
+
+The batch also runs `tests/lcd_spans_model.c`, exercising the common
+LCD five-tap folded implementation in 165,120 length/offset/weight/coverage
+and positive/negative-pitch cases, including overlapping spans.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -77,6 +83,14 @@ handling has `XXX` stubs in FreeType and is out of scope.
 See `docs/RETRO_BITMAP_BLEND.md` for exactness, the LUT setup cost,
 and its 1280-byte stack footprint.  These are portable C fast paths,
 not additional MMI/VIS1 instructions.
+
+### LCD five-tap filtering
+
+Build both FreeType versions with `FT_CONFIG_OPTION_SUBPIXEL_RENDERING`
+enabled (it is disabled by default). Compare `lcd` and `lcd-v` output
+from `tests/retro_glyph_hash.c` against the unchanged renderer. See
+`docs/RETRO_LCD_SPANS.md`. Check `PADDB` instruction emission only
+if the R5900 MMI option is selected; do not use saturating `PADDUB`.
 
 ## Tier C: end-to-end glyph rendering
 
