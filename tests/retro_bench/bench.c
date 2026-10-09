@@ -208,22 +208,27 @@ static uint64_t rb_screen_median6(const uint64_t data[RB_SAMPLES])
 static void rb_screen_start(void)
 {
   init_scr(); /* initializes the GS framebuffer/display */
+  unsigned i;
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,0);
-  scr_printf("FreeType RETRO | PS2 R5900 MMI\n");
-  scr_printf("Scalar / A / B / MMI  SAME ELF\n");
-  scr_printf("==========================================\n");
-  scr_setXY(0,4);
-  scr_printf("Correctness tests starting: %u suites\n",nc);
-  scr_setXY(0,6);
-  scr_printf("Do not stop the ELF before RESULT appears.\n");
+  scr_printf("FREETYPE RETRO | PS2 EE MMI | VALIDATION + BENCHMARK");
+  scr_setXY(0,1);
+  scr_printf("Scalar / A / B / MMI | %u suites | 6 paired samples",nc);
+  scr_setXY(0,2);
+  scr_printf("%-15s %-16s %s","FUNCTION","PROVISIONAL BEST","SPEED");
+  for(i=0;i<RB_SCREEN_GROUPS;i++){
+    scr_setXY(0,(int)i+3);
+    scr_printf("%-15.15s %-16s %s",rb_screen_names[i],"WAIT","--");
+  }
+  scr_setXY(0,21);
+  scr_printf("VERIFY   0/%-3u %-24s",nc,"starting");
 }
 static void rb_screen_progress(const char* phase,unsigned done,
                                const char* name)
 {
   scr_setfontcolor(RB_WHITE);
-  scr_setXY(0,4);
-  scr_printf("%-8s %2u/%2u  %-24.24s      ",
+  scr_setXY(0,21);
+  scr_printf("%-11.11s %3u/%-3u %-24.24s       ",
              phase,done,nc,name);
 }
 /* Used for all exits on PS2, successful and unsuccessful.
@@ -233,13 +238,13 @@ static int rb_screen_hold(int status,const char* phase,const char* name)
 {
   scr_setXY(0,22);
   scr_setfontcolor(status?RB_RED:RB_GREEN);
-  scr_printf("%s  %-15.15s %-21.21s",
+  scr_printf("%s | %-14.14s %-21.21s  ",
              status?"RESULT: FAIL":"RESULT: PASS",phase,name);
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,23);
-  scr_printf("Console log has full per-size details.");
+  scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
   scr_setXY(0,24);
-  scr_printf("Display held: PS2SDK SleepThread().");
+  scr_printf("COMPLETE | results retained on screen");
   fflush(stdout);
   SleepThread();
   return status; /* unlikely to return */
@@ -280,39 +285,46 @@ static void rb_screen_record(const struct rb_case* t,
   dst->candidate=(best!=base && percent>=105U)?
                      label(t->kind,best):label(t->kind,base);
   dst->ratio_percent=(best!=base && percent>=105U)?percent:100U;
+  /* Publish each measured group immediately; do not wait for final page. */
+  scr_setXY(0,(int)g+3);
+  scr_setfontcolor(dst->ratio_percent>100U?RB_GREEN:RB_WHITE);
+  scr_printf("%-15.15s %-16.16s %3u.%02ux       ",
+             rb_screen_names[g],dst->candidate,
+             dst->ratio_percent/100U,dst->ratio_percent%100U);
 }
 static void rb_screen_results_page(void)
 {
   unsigned i,shown=0;
-  init_scr(); /* clear progress screen and initialize final results */
   scr_setfontcolor(RB_WHITE);
   scr_setXY(0,0);
-  scr_printf("FREETYPE RETRO - PS2 EE RESULTS\n");
-  scr_printf("CORRECTNESS: PASS   %u SUITES   6 SAMPLES\n",nc);
-  scr_printf("TYPE            PROVISIONAL BEST  SPEED\n");
+  scr_printf("FREETYPE RETRO | PS2 EE MMI | COMPLETE - PASS");
+  scr_setXY(0,1);
+  scr_printf("VALIDATION PASS | %u SUITES | 6 PAIRED SAMPLES",nc);
+  scr_setXY(0,2);
+  scr_printf("%-15s %-16s %s","FUNCTION","PROVISIONAL BEST","SPEED");
   for(i=0;i<RB_SCREEN_GROUPS;i++){
     const struct rb_screen_entry* x=&rb_screen_results[i];
     scr_setXY(0,(int)i+3);
     if(!x->present){
       scr_setfontcolor(RB_YELLOW);
-      scr_printf("%-15.15s --",rb_screen_names[i]);
+      scr_printf("%-15.15s %-16s %s",rb_screen_names[i],"N/A","--");
       continue;
     }
     shown++;
     scr_setfontcolor(x->ratio_percent>100U?RB_GREEN:RB_WHITE);
-    scr_printf("%-15.15s %-16.16s %3u.%02ux",
+    scr_printf("%-15.15s %-16.16s %3u.%02ux       ",
                rb_screen_names[i],x->candidate,
                x->ratio_percent/100U,x->ratio_percent%100U);
   }
   scr_setXY(0,21);
   scr_setfontcolor(RB_YELLOW);
-  scr_printf("Shown: %u/%u groups  (largest cases)",shown,RB_SCREEN_GROUPS);
+  scr_printf("COMPLETE | measured groups %u/%u (largest cases)   ",shown,RB_SCREEN_GROUPS);
   scr_setXY(0,22);
   scr_setfontcolor(RB_GREEN);
-  scr_printf("RESULT: PASS - correctness and timings");
+  scr_printf("RESULT: PASS | checks + timings finished");
   scr_setXY(0,23);
   scr_setfontcolor(RB_WHITE);
-  scr_printf("These winners are PROVISIONAL only.");
+  scr_printf("Winners provisional; confirm with verdict.py");
   scr_setXY(0,24);
   scr_printf("Full verdict: collect RB1 logs on PC");
 }
@@ -767,7 +779,7 @@ static int run(const struct rb_case* t,unsigned v,unsigned reps)
   }
   return 1;
 }
-static int validate_case(const struct rb_case* t)
+static int validate_case(const struct rb_case* t,int log_checks)
 {
   unsigned v,trial,n=variants(t->kind);
   FT_Byte oracle[RB_OUT_SIZE];
@@ -780,7 +792,8 @@ static int validate_case(const struct rb_case* t)
     expected=digest(t);
     memcpy(oracle,output,sizeof(oracle));
     memcpy(ref,result,sizeof(ref));
-    printf("RB1,CHECK,%s,scalar,PASS,%08lx\n",t->name,(unsigned long)expected);
+    if(log_checks)
+      printf("RB1,CHECK,%s,scalar,PASS,%08lx\n",t->name,(unsigned long)expected);
     for(v=1;v<n;v++){
       prepare(t,UINT32_C(0x6f234c91)+(unsigned)trial*101U);
       if(!run(t,v,1))return 0;
@@ -792,8 +805,9 @@ static int validate_case(const struct rb_case* t)
                 t->name,label(t->kind,v),(unsigned long)got);
         return 0;
       }
-      printf("RB1,CHECK,%s,%s,PASS,%08lx\n",t->name,
-             label(t->kind,v),(unsigned long)got);
+      if(log_checks)
+        printf("RB1,CHECK,%s,%s,PASS,%08lx\n",t->name,
+               label(t->kind,v),(unsigned long)got);
     }
   }
   return 1;
@@ -836,7 +850,7 @@ int main(void)
   /* Full buffer correctness and guard checks BEFORE any timings. */
   for(j=0;j<nc;j++){
     rb_screen_progress("VERIFY",j+1,cases[j].name);
-    if(!validate_case(&cases[j])){
+    if(!validate_case(&cases[j],1)){
       fprintf(stderr,"RB1,FATAL,%s,correctness\n",cases[j].name);
       return rb_screen_hold(1,"CHECK FAILED",cases[j].name);
     }
@@ -848,7 +862,14 @@ int main(void)
     uint64_t samples[4][RB_SAMPLES]={{0}};
     t=&cases[j];
     n=variants(t->kind);
-    rb_screen_progress("BENCH",j+1,t->name);
+    rb_screen_progress("CHECK+BENCH",j+1,t->name);
+    /* The global RB1 correctness gate remains before every SAMPLE.
+     * Recheck this workload immediately before its timings without
+     * adding CHECK rows after GATE (verdict.py requires strict order). */
+    if(!validate_case(t,0)){
+      fprintf(stderr,"RB1,FATAL,%s,pre-benchmark-correctness\n",t->name);
+      return rb_screen_hold(1,"CHECK FAILED",t->name);
+    }
     /* AB/BA and ABC/BCA/CAB; stable input, rotated thermal/cache order */
     for(s=0;s<RB_SAMPLES;s++){
       uint32_t sample_digests[4]={0,0,0,0};
