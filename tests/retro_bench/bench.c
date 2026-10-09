@@ -591,6 +591,12 @@ int main(void)
   uint64_t elapsed,hz=clock_hz(),begin,end;
   const struct rb_case* t;
 
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+  if(sizeof(void*)!=4 || sizeof(long)!=4){
+    fprintf(stderr,"RB1,FATAL,abi,expected-32-bit-long-and-pointers\n");
+    return 2;
+  }
+#endif
   printf("RB1,META,%s,%s,%u,%llu\n",
          RB_TARGET,RETRO_BENCH_BUILD_ID,RB_SAMPLES,
          (unsigned long long)hz);
