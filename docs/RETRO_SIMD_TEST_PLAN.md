@@ -16,7 +16,7 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_BLEND_LUT` | Both (portable C) | Adaptive premultiplied color/alpha LUT for >=2048-pixel masks |
 | `FT_CONFIG_OPTION_RETRO_LCD_SPANS` | Both (portable C) | Exact five-tap LCD folding into constant-increment horizontal/vertical spans |
 | `FT_CONFIG_OPTION_MMI_LCD_SPANS` | PS2 R5900 | 16-byte PADDB wrapping additions for long LCD span increments, plus portable folding |
-| `FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS` | Both (portable C) | Group four 4x raster subpixel additions exactly |
+| `FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS` | Both (portable C) | Group memory traffic for four raster subpixels, preserve every per-sample correction |
 | `FT_CONFIG_OPTION_RETRO_MONO_SPANS` | Both (portable C) | Long MONO interior bytes via memset, preserving masked edges |
 | `FT_CONFIG_OPTION_MMI_MONO_SPANS` | PS2 R5900 | 128-bit aligned SQ stores for full long MONO span interiors |
 | `FT_CONFIG_OPTION_VIS1_MONO_SPANS` | SPARC VIS1 | 64-bit aligned doubleword stores for full long MONO span interiors |
@@ -25,6 +25,7 @@ scalar build of the same FreeType source revision.
 | `FT_CONFIG_OPTION_RETRO_MSB_R5900` | PS2 R5900 | Optional PLZCW unsigned MSB mapping, guarding bit31 and zero |
 | `FT_CONFIG_OPTION_RETRO_MSB_SPARC32` | SPARC 32-bit ABI | Optional 32-bit De Bruijn most-significant-bit index via 32-byte table |
 | `FT_CONFIG_OPTION_RETRO_DIVFIX_FAST32` | Both (portable 32-bit C) | Exact power-of-two and bounded-numerator FT_DivFix shortcuts; original overflow fallbacks |
+| `FT_CONFIG_OPTION_RETRO_SQRT_RESTORING` | Both (portable 32-bit C, FT_INT64) | 24-step division-free unsigned restoring square root with exact nearest rounding |
 
 `FT_CONFIG_OPTION_NO_ASSEMBLER` disables architecture-specific MMI/VIS1
 assembly but not the portable C optimizations.  Standalone builds of
@@ -65,6 +66,12 @@ The new `tests/divfix_fast32_model.c` checks the actual exact 32-bit
 shortcut helper against the original mathematical quotient and guards
 both legacy fallback behaviors. It covers 1,961,233 signed/power-of-two,
 rounding and overflow scenarios, including division by zero.
+
+The batch additionally invokes `tests/sqrtfixed_restoring_model.c`,
+covering **1,458,915 input cases** against two independently implemented
+references: the existing FT_INT64 Babylonian iteration and an exact
+integer binary-search square-root oracle. The 24-step unsigned restoring
+helper does not execute MMI/VIS1 instructions or use 64-bit division.
 
 This runs deterministic byte-level models only, not actual MMI or VIS1
 instructions.  It explores short/long rows, modulo-16 alignments,
@@ -163,6 +170,19 @@ optional backend. See `docs/RETRO_DIVFIX_NORMLEN.md`.
 Both builds must use the same **32-bit ABI** and the same `FT_INT64`
 configuration. The portable `RETRO_DIVFIX_FAST32` option remains
 available when `NO_ASSEMBLER` is set.
+
+### Division-free fixed-point square root
+
+Build `tests/sqrtfixed_freetype_compare.c` for baseline and opt-in
+FreeType archives, keeping the same source version, 32-bit ABI and
+`FT_INT64` configuration. Since `FT_SqrtFixed` is an internal
+`FT_BASE` symbol, link with the **matching static FreeType archive**.
+Compare its fingerprint over **512,307 inputs**, plus end-to-end glyph
+hashes. On real EE/SPARC32 CPUs benchmark the new 24-step restoring
+integer loop against the compiler's Babylonian 64-bit division code.
+The switch is ignored if FT_INT64 is unavailable; the existing
+25-cycle Meessen routine stays unchanged in that build. See
+`docs/RETRO_SQRTFIXED.md`.
 
 ## Tier C: end-to-end glyph rendering
 
