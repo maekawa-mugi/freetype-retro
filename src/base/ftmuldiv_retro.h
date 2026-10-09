@@ -35,7 +35,8 @@
  * selected after an UNSIGNED WRAPPING a+b test, and a slow path that
  * saturates huge quotients.  Keep these existing corner behaviors:
  * only select shortcuts proven to yield the same result from the
- * original direct path, and never rewrite cases where a+b overflows.
+ * original direct path or the original unsigned 64-bit slow path,
+ * and never rewrite cases where a+b overflows.
  */
 static FT_Bool
 ft_muldiv_retro_fast32( FT_UInt32   a,
@@ -105,16 +106,50 @@ ft_muldiv_retro_fast32( FT_UInt32   a,
 
 #else /* !FT_INT64 */
 
-    /* Only use this shortcut when its ENTIRE rounded numerator
-     * fits in 32 bits, and the baseline a+b condition above
-     * selected a guaranteed overflow-free direct calculation.
-     * For other values, leave the emulated 64-bit behavior intact.
+    /* Reconstruct the unsigned 64-bit product in two 32-bit words,
+     * without FT_UInt64 support.  This replaces the baseline's
+     * emulated long division with a shift, after applying the
+     * original half-denominator rounding and carry.
+     *
+     * For huge quotients the old ft_div64by32 function returns
+     * 0x7FFFFFFF; preserve that result rather than allowing the
+     * shifted quotient to wrap.  Cases where a+b itself wraps have
+     * already been excluded before entering this block.
      */
-    if ( a <= 32767U && b <= 32767U )
+    FT_UInt32  al = a & 0xFFFFU;
+    FT_UInt32  ah = a >> 16;
+    FT_UInt32  bl = b & 0xFFFFU;
+    FT_UInt32  bh = b >> 16;
+    FT_UInt32  lo = al * bl;
+    FT_UInt32  hi = ah * bh;
+    FT_UInt32  p1 = ah * bl;
+    FT_UInt32  p2 = al * bh;
+    FT_UInt32  old_lo;
+
+
+    old_lo = lo;
+    lo += p1 << 16;
+    hi += ( p1 >> 16 ) + ( lo < old_lo );
+
+    old_lo = lo;
+    lo += p2 << 16;
+    hi += ( p2 >> 16 ) + ( lo < old_lo );
+
+    if ( rounding )
     {
-      *result = ( a * b + ( rounding ? ( c >> 1 ) : 0U ) ) >> shift;
-      return 1;
+      old_lo = lo;
+      lo += c >> 1;
+      hi += lo < old_lo;
     }
+
+    if ( hi >= c )
+      *result = 0x7FFFFFFFU;
+    else if ( !shift )
+      *result = lo;
+    else
+      *result = ( hi << ( 32 - shift ) ) | ( lo >> shift );
+
+    return 1;
 
 #endif /* FT_INT64 */
   }
