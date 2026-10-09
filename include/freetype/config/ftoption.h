@@ -403,6 +403,26 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Optional 32-bit FT_MulDiv and FT_MulDiv_No_Round shortcuts:
+   * - if either multiplier equals the divisor, return the other;
+   * - for safely bounded unsigned numerators, use native 32/32 div;
+   * - for power-of-two denominators, use a shift instead of long
+   *   division, preserving the existing 32-bit output behavior.
+   *
+   * On FT_INT64 builds this avoids some dynamic 64-bit division.
+   * On 32-bit-only builds the full 64-bit unsigned product is
+   * reconstructed into two 32-bit words for the shift path; huge
+   * quotients preserve the old 0x7FFFFFFF saturation sentinel.
+   *
+   * Disabled by default. Requires 32-bit FT_Long. Portable C works
+   * under FT_CONFIG_OPTION_NO_ASSEMBLER. Numerically distinct
+   * historic a+b-overflow cases always use the original implementation.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULDIV_FAST32 */
+
+
+  /**************************************************************************
+   *
    * LZW-compressed file support.
    *
    *   FreeType now handles font files that have been compressed with the
