@@ -56,6 +56,10 @@
 #include "ftbitmap_bgra_gray_retro.h"
 #endif
 
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+#include "ftbitmap_mono_embolden_retro.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -325,6 +329,11 @@
     FT_UInt         y;
     FT_Int          xstr, ystr;
 
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+    FT_Retro_Mono_Embolden_Table  mono_table;
+    FT_Bool                       use_mono_table;
+#endif
+
 
     if ( !library )
       return FT_THROW( Invalid_Library_Handle );
@@ -396,6 +405,15 @@
       p = bitmap->buffer + (FT_UInt)pitch * ( bitmap->rows - 1 );
     }
 
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+    /* Build the 512-byte lookup only when enough interior bytes
+     * justify setup and the source really is packed MONO. */
+    use_mono_table = bitmap->pixel_mode == FT_PIXEL_MODE_MONO &&
+                     xstr >= 2 && (FT_ULong)pitch * bitmap->rows >= 1024UL;
+    if ( use_mono_table )
+      ft_bitmap_retro_mono_embolden_prepare( &mono_table, (FT_UInt)xstr );
+#endif
+
     /* for each row */
     for ( y = 0; y < bitmap->rows; y++ )
     {
@@ -405,6 +423,11 @@
        * From the last pixel on, make each pixel or'ed with the
        * `xstr' pixels before it.
        */
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+      if ( use_mono_table )
+        ft_bitmap_retro_mono_embolden_row( p, pitch, &mono_table );
+      else
+#endif
 #ifdef FT_BITMAP_MMI_ENABLED
       /* Each 8-bit 256-level pixel is a saturated sum of the original
        * xstr+1 coverage bytes.  The R5900 path handles 1..4 pixels, including
