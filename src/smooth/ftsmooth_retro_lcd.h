@@ -177,7 +177,12 @@ ft_smooth_retro_lcd_vertical( unsigned char*        dst,
 
 
     ft_smooth_retro_lcd_add_bytes( dst, len, increment );
-    dst += pitch;
+
+    /* Do not form an unused pointer one row beyond the final tap,
+     * particularly when pitch is negative and dst is the last row.
+     */
+    if ( k < 4 )
+      dst += pitch;
   }
 }
 
