@@ -1,5 +1,19 @@
 # FreeType Retro: correctness-gated A/B/C kernel benchmark
 
+## Extended scratchpad LUT hypotheses
+
+The same PS2 ELF now also tests blend-spr-{16,512,4096},
+blend-spr-cold-{16,4096}, mono-spr-{16,512,4096} and
+mono-spr-cold-{16,4096}. WARM and COLD match the existing BGRA
+gray experiment. Blend compares scalar, exact255, RAM LUT and
+SPR LUT (four contenders); MONO compares scalar and two LUT placements.
+Each is correctness gated and exports complete RB1 case/sample data.
+The final GS screenshot also shows RAM/SPR warm speed ratios for
+BGRA Gray, BGRA Blend and MONO Embolden at size 4096.
+Ratios above 1 mean SPR won the placement-only comparison.
+The screenshots are provisional; full RB1 logs are still required.
+
+
 ## PS2 scratchpad BGRA Gray benchmark
 
 The R5900 bench adds bgra-spr-{16,512,4096} (warm) and
