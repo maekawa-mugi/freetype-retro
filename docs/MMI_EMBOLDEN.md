@@ -39,6 +39,14 @@ The standalone `ftgrays.c` renderer ignores the optional feature.
 
 ## Validation
 
+The pipelined row helper keeps original current/previous quadwords in
+registers throughout one assembly loop. Each previous quadword becomes
+the next current quadword; strengths 2..4 reuse it for every QFSRV tap.
+Strength dispatch is outside the loop, and scalar edges are unchanged.
+Conservative SA spacing is retained. The original helper remains a
+same-ELF benchmark alternative (`mmi_legacy` versus `mmi`). This change
+does not establish a hardware speedup or alter the opt-in build switch.
+
 Run the host-side equivalence model in `tests/mmi_embolden_equivalence.c`
 (via `tests/run_retro_simd_models.sh`), then compare
 `FT_Bitmap_Embolden` output on an EE against the default scalar build over

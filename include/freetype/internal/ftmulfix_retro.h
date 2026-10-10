@@ -48,7 +48,7 @@ ft_mulfix_retro_round_words( FT_UInt32  lo,
 #endif
 
 static FT_Int32
-ft_mulfix_retro_hw( FT_Int32  a,
+ft_mulfix_retro_hw_legacy( FT_Int32  a,
                     FT_Int32  b )
 {
   FT_UInt32  lo;
@@ -81,6 +81,32 @@ ft_mulfix_retro_hw( FT_Int32  a,
     : "hi", "lo" );
 
   return ft_mulfix_retro_round_words( lo, hi );
+}
+
+static FT_Int32
+ft_mulfix_retro_hw( FT_Int32 a, FT_Int32 b )
+{
+  FT_UInt32 lo, bias, negative;
+  FT_Int32 hi;
+  FT_UInt32 rounded;
+  /* MULT's GPR result supplies LO directly.  Compute the rounding bias
+   * during the conservative HI latency instead of five empty slots.
+   * A zero product with opposite input signs still rounds to zero.
+   */
+  __asm__ volatile (
+    ".set push\n\t" ".set noreorder\n\t"
+    "mult %0, %4, %5\n\t"
+    "xor %2, %4, %5\n\t"
+    "sra %2, %2, 31\n\t"
+    "andi %2, %2, 1\n\t"
+    "ori %3, $zero, 32768\n\t"
+    "subu %3, %3, %2\n\t"
+    "mfhi %1\n\t" ".set pop\n\t"
+    : "=&r" ( lo ), "=&r" ( hi ), "=&r" ( negative ), "=&r" ( bias )
+    : "r" ( a ), "r" ( b ) : "hi", "lo" );
+  rounded = lo + bias;
+  return (FT_Int32)( ( ( (FT_UInt32)hi + ( rounded < lo ) ) << 16 ) |
+                     ( rounded >> 16 ) );
 }
 
 #elif defined( FT_CONFIG_OPTION_RETRO_MULFIX_SPARC32 )

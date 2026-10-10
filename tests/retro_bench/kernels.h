@@ -36,7 +36,15 @@ static FT_UInt rb_msb_scalar(FT_UInt32 v)
     if(v & (UINT32_C(1)<<bit)) return bit;
   return 0;
 }
-#define FT_MSB(v) rb_msb_scalar(v)
+static FT_UInt rb_msb_builtin(FT_UInt32 v)
+{
+#if defined(__GNUC__)
+  return v ? (FT_UInt)(31 - __builtin_clz(v)) : 0;
+#else
+  return rb_msb_scalar(v);
+#endif
+}
+#define FT_MSB(v) rb_msb_builtin(v)
 
 #define FT_RETRO_MULDIV_MODEL_ONLY
 #define FT_RETRO_DIVFIX_MODEL_ONLY

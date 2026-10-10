@@ -18,7 +18,7 @@ out=${1:-"$root/build-retro-bench/freetype_mmi.elf"}
 build_jobs=${BUILD_JOBS:-${JOBS:-$(nproc)}}
 (( build_jobs >= 1 )) || { echo "BUILD_JOBS must be >= 1" >&2; exit 2; }
 mkdir -p "$(dirname "$out")"
-build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
+build_id=$(git -C "$root" describe --always --dirty 2>/dev/null || echo unknown)
 make -f "$root/tests/retro_bench/Makefile.ps2" -j "$build_jobs" \
   ROOT="$root" OUT="$out" EE_CC="$cc" CRT_DIR="$crt_dir" \
   PS2SDK="$PS2SDK" BUILD_ID="$build_id" all

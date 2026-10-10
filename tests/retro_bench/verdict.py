@@ -60,6 +60,7 @@ def parse_file(path):
     done_count = None
     phase = "initial"
     failures = []
+    observed_cases = set()
 
     with Path(path).open("r", encoding="utf8", errors="replace") as handle:
         for line_no, line in enumerate(handle, 1):
@@ -70,6 +71,10 @@ def parse_file(path):
                 if len(row) < 2:
                     raise ValueError("missing RB1 operation")
                 op = row[1]
+                # Keep rejected suite names for BLOCKED diagnostics only;
+                # they never substitute for the required CASE manifest.
+                if op in ("CHECK", "SAMPLE") and len(row) > 2:
+                    observed_cases.add(row[2])
 
                 if op == "META":
                     if len(row) != 6 or phase != "initial":
@@ -185,7 +190,8 @@ def parse_file(path):
         if set(timings.get(key, {})) != set(range(SAMPLES)):
             failures.append(f"{key}: expected exactly {SAMPLES} SAMPLE indices")
     return {"file": str(path), "meta": meta, "manifest": manifest,
-            "checks": checks, "timings": timings, "failures": failures}
+            "checks": checks, "timings": timings, "failures": failures,
+            "observed_cases": observed_cases}
 
 def analyze(log, min_speedup, min_lower, max_jitter):
     cases = defaultdict(set)
@@ -195,6 +201,9 @@ def analyze(log, min_speedup, min_lower, max_jitter):
                              for v in desc["variants"]}):
         cases[case].add(variant)
     rows = []
+    for case in log.get("observed_cases", ()):
+        if case not in cases:
+            cases[case].add("(unverified)")
     invalid = bool(log["failures"])
     baselines = {}
     for case in sorted(cases):

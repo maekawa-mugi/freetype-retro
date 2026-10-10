@@ -548,7 +548,7 @@ static const FT_Byte ft_mmi_gray2x4[256][4]
 };
 
 static void
-ft_bitmap_mmi_convert_mono_row( const FT_Byte* src,
+ft_bitmap_mmi_convert_mono_row_legacy( const FT_Byte* src,
                                 FT_Byte*       dst,
                                 FT_UInt        width )
 {
@@ -588,7 +588,7 @@ ft_bitmap_mmi_convert_mono_row( const FT_Byte* src,
 
 
 static void
-ft_bitmap_mmi_convert_gray2_row( const FT_Byte* src,
+ft_bitmap_mmi_convert_gray2_row_legacy( const FT_Byte* src,
                                  FT_Byte*       dst,
                                  FT_UInt        width )
 {
@@ -643,7 +643,7 @@ ft_bitmap_mmi_convert_gray2_row( const FT_Byte* src,
  * R5900 is little-endian in the intended PS2 execution environment.
  */
 static void
-ft_bitmap_mmi_convert_gray4_row( const FT_Byte* src,
+ft_bitmap_mmi_convert_gray4_row_legacy( const FT_Byte* src,
                                  FT_Byte*       dst,
                                  FT_UInt        width )
 {
@@ -683,6 +683,206 @@ ft_bitmap_mmi_convert_gray4_row( const FT_Byte* src,
 
     dst[x] = (FT_Byte)( x & 1 ? val & 15U : val >> 4 );
   }
+}
+
+/* Two-block schedules and LUT-free experimental alternatives. */
+static void
+ft_bitmap_mmi_convert_mono_row(const FT_Byte* src, FT_Byte* dst, FT_UInt width)
+{
+  FT_UInt x = 0;
+  if (((FT_ULong)dst & 15UL) == 0)
+  {
+    for (; width - x >= 32; x += 32)
+    {
+      const FT_Byte* p0=ft_mmi_mono8[src[x/8]];
+      const FT_Byte* p1=ft_mmi_mono8[src[x/8+1]];
+      const FT_Byte* p2=ft_mmi_mono8[src[x/8+2]];
+      const FT_Byte* p3=ft_mmi_mono8[src[x/8+3]];
+      FT_ULong a,b,c,d;
+      __asm__ volatile (
+        ".set push\n\t" ".set noreorder\n\t"
+        "ld %0, 0(%4)\n\t"
+        "ld %1, 0(%5)\n\t"
+        "ld %2, 0(%6)\n\t"
+        "ld %3, 0(%7)\n\t"
+        "pcpyld %0, %1, %0\n\t"
+        "pcpyld %2, %3, %2\n\t"
+        "sq %0, 0(%8)\n\t"
+        "sq %2, 16(%8)\n\t"
+        ".set pop\n\t"
+        : "=&r"(a), "=&r"(b), "=&r"(c), "=&r"(d)
+        : "r"(p0), "r"(p1), "r"(p2), "r"(p3), "r"(dst+x) : "memory" );
+    }
+  }
+  ft_bitmap_mmi_convert_mono_row_legacy(src+x/8, dst+x, width-x);
+}
+
+static void
+ft_bitmap_mmi_convert_gray2_row(const FT_Byte* src, FT_Byte* dst, FT_UInt width)
+{
+  FT_UInt x = 0;
+  if (((FT_ULong)dst & 15UL) == 0)
+  {
+    for (; width - x >= 32; x += 32)
+    {
+      const FT_Byte* p0=ft_mmi_gray2x4[src[x/4+0]];
+      const FT_Byte* p1=ft_mmi_gray2x4[src[x/4+1]];
+      const FT_Byte* p2=ft_mmi_gray2x4[src[x/4+2]];
+      const FT_Byte* p3=ft_mmi_gray2x4[src[x/4+3]];
+      const FT_Byte* p4=ft_mmi_gray2x4[src[x/4+4]];
+      const FT_Byte* p5=ft_mmi_gray2x4[src[x/4+5]];
+      const FT_Byte* p6=ft_mmi_gray2x4[src[x/4+6]];
+      const FT_Byte* p7=ft_mmi_gray2x4[src[x/4+7]];
+      FT_ULong a,b,c,d,e,f,g,h;
+      __asm__ volatile (
+        ".set push\n\t" ".set noreorder\n\t"
+        "lwu %0, 0(%8)\n\t"
+        "lwu %1, 0(%9)\n\t"
+        "lwu %2, 0(%10)\n\t"
+        "lwu %3, 0(%11)\n\t"
+        "lwu %4, 0(%12)\n\t"
+        "lwu %5, 0(%13)\n\t"
+        "lwu %6, 0(%14)\n\t"
+        "lwu %7, 0(%15)\n\t"
+        "dsll32 %1, %1, 0\n\t"
+        "dsll32 %3, %3, 0\n\t"
+        "dsll32 %5, %5, 0\n\t"
+        "dsll32 %7, %7, 0\n\t"
+        "or %0, %0, %1\n\t"
+        "or %2, %2, %3\n\t"
+        "or %4, %4, %5\n\t"
+        "or %6, %6, %7\n\t"
+        "pcpyld %0, %2, %0\n\t"
+        "pcpyld %4, %6, %4\n\t"
+        "sq %0, 0(%16)\n\t"
+        "sq %4, 16(%16)\n\t"
+        ".set pop\n\t"
+        : "=&r"(a), "=&r"(b), "=&r"(c), "=&r"(d), "=&r"(e), "=&r"(f), "=&r"(g), "=&r"(h)
+        : "r"(p0), "r"(p1), "r"(p2), "r"(p3), "r"(p4), "r"(p5), "r"(p6), "r"(p7), "r"(dst+x) : "memory" );
+    }
+  }
+  ft_bitmap_mmi_convert_gray2_row_legacy(src+x/4, dst+x, width-x);
+}
+
+static void
+ft_bitmap_mmi_convert_gray4_row(const FT_Byte* src, FT_Byte* dst, FT_UInt width)
+{
+  FT_UInt x = 0;
+  if (((FT_ULong)dst & 15UL) == 0 && ((FT_ULong)src & 7UL) == 0)
+  {
+    for (; width - x >= 32; x += 32)
+    {
+      FT_ULong a,b,c,d;
+      __asm__ volatile (
+        ".set push\n\t" ".set noreorder\n\t"
+        "ld %0, 0(%4)\n\t"
+        "ld %1, 8(%4)\n\t"
+        "pextlb %0, $zero, %0\n\t"
+        "pextlb %1, $zero, %1\n\t"
+        "psrlh %2, %0, 4\n\t"
+        "psrlh %3, %1, 4\n\t"
+        "psllh %0, %0, 12\n\t"
+        "psllh %1, %1, 12\n\t"
+        "psrlh %0, %0, 4\n\t"
+        "psrlh %1, %1, 4\n\t"
+        "por %0, %0, %2\n\t"
+        "por %1, %1, %3\n\t"
+        "sq %0, 0(%5)\n\t"
+        "sq %1, 16(%5)\n\t"
+        ".set pop\n\t"
+        : "=&r"(a), "=&r"(b), "=&r"(c), "=&r"(d)
+        : "r"(src+x/2), "r"(dst+x) : "memory" );
+    }
+  }
+  ft_bitmap_mmi_convert_gray4_row_legacy(src+x/2, dst+x, width-x);
+}
+
+static void
+ft_bitmap_mmi_convert_mono_row_direct(const FT_Byte* src, FT_Byte* dst, FT_UInt width)
+{
+  FT_UInt x=0;
+  if (((FT_ULong)dst & 15UL) == 0)
+    for (; width-x >= 16; x+=16)
+    {
+      FT_ULong words, hi, lo, tmp, mask;
+      FT_UInt packed=src[x/8] | ((FT_UInt)src[x/8+1]<<8);
+      __asm__ volatile (
+        ".set push\n\t" ".set noreorder\n\t"
+        "pcpyld %0, $zero, %5\n\t"
+        "pextlb %0, $zero, %0\n\t"
+        "pextlh %0, $zero, %0\n\t"
+        "psrlw %1, %0, 7\n\t"
+        "psrlw %3, %0, 6\n\t"
+        "psllw %3, %3, 8\n\t"
+        "por %1, %1, %3\n\t"
+        "psrlw %3, %0, 5\n\t"
+        "psllw %3, %3, 16\n\t"
+        "por %1, %1, %3\n\t"
+        "psrlw %3, %0, 4\n\t"
+        "psllw %3, %3, 24\n\t"
+        "por %1, %1, %3\n\t"
+        "psrlw %2, %0, 3\n\t"
+        "psrlw %3, %0, 2\n\t"
+        "psllw %3, %3, 8\n\t"
+        "por %2, %2, %3\n\t"
+        "psrlw %3, %0, 1\n\t"
+        "psllw %3, %3, 16\n\t"
+        "por %2, %2, %3\n\t"
+        "por %3, %0, $zero\n\t"
+        "psllw %3, %3, 24\n\t"
+        "por %2, %2, %3\n\t"
+        "lui %4, 257\n\t"
+        "ori %4, %4, 257\n\t"
+        "dsll32 %3, %4, 0\n\t"
+        "or %4, %4, %3\n\t"
+        "pcpyld %4, %4, %4\n\t"
+        "pand %1, %1, %4\n\t"
+        "pand %2, %2, %4\n\t"
+        "pextlw %1, %2, %1\n\t"
+        "sq %1, 0(%6)\n\t"
+        ".set pop\n\t"
+        : "=&r"(words), "=&r"(hi), "=&r"(lo), "=&r"(tmp), "=&r"(mask)
+        : "r"(packed), "r"(dst+x) : "memory" );
+    }
+  ft_bitmap_mmi_convert_mono_row_legacy(src+x/8, dst+x, width-x);
+}
+
+static void
+ft_bitmap_mmi_convert_gray2_row_direct(const FT_Byte* src, FT_Byte* dst, FT_UInt width)
+{
+  FT_UInt x=0;
+  if (((FT_ULong)dst & 15UL) == 0)
+    for (; width-x >= 16; x+=16)
+    {
+      FT_ULong words, hi, lo, tmp, mask;
+      FT_UInt packed=src[x/4] | ((FT_UInt)src[x/4+1]<<8) | ((FT_UInt)src[x/4+2]<<16) | ((FT_UInt)src[x/4+3]<<24);
+      __asm__ volatile (
+        ".set push\n\t" ".set noreorder\n\t"
+        "pcpyld %0, $zero, %5\n\t"
+        "pextlb %0, $zero, %0\n\t"
+        "pextlh %0, $zero, %0\n\t"
+        "psrlw %1, %0, 6\n\t"
+        "psrlw %3, %0, 4\n\t"
+        "psllw %3, %3, 8\n\t"
+        "por %1, %1, %3\n\t"
+        "psrlw %3, %0, 2\n\t"
+        "psllw %3, %3, 16\n\t"
+        "por %1, %1, %3\n\t"
+        "por %3, %0, $zero\n\t"
+        "psllw %3, %3, 24\n\t"
+        "por %1, %1, %3\n\t"
+        "lui %4, 771\n\t"
+        "ori %4, %4, 771\n\t"
+        "dsll32 %3, %4, 0\n\t"
+        "or %4, %4, %3\n\t"
+        "pcpyld %4, %4, %4\n\t"
+        "pand %1, %1, %4\n\t"
+        "sq %1, 0(%6)\n\t"
+        ".set pop\n\t"
+        : "=&r"(words), "=&r"(hi), "=&r"(lo), "=&r"(tmp), "=&r"(mask)
+        : "r"(packed), "r"(dst+x) : "memory" );
+    }
+  ft_bitmap_mmi_convert_gray2_row_legacy(src+x/4, dst+x, width-x);
 }
 
 #endif /* FTBITMAP_CONVERT_MMI_H_ */

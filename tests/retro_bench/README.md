@@ -247,5 +247,89 @@ repeatable performance, and needs separate recommendations by CPU,
 input length and workload. If evidence is inconclusive, keep the
 option disabled, rather than unconditionally choosing A or B.
 
-**State:** harness and analyzer committed to a Draft PR.
-Neither compilation, tests nor benchmarks have been executed here.
+## Additional PS2 candidates and workload coverage
+
+The opt-in library and the same-ELF harness now contain:
+
+- GRAY8 row pipelines that retain original blocks across iterations and
+  dispatch strength outside the loop. Compare `mmi_legacy` and `mmi`.
+- 32-pixel packed conversion schedules, plus harness-only LUT-free
+  MONO/GRAY2 candidates. Compare scalar, `mmi_legacy`, `mmi`, `mmi_direct`.
+- Exact BGRA reciprocal alpha division, including a constant-alpha-255
+  path. Compare scalar, division-based `option_c`, and `reciprocal`.
+- MulFix scheduling that obtains LO through MULT's destination register
+  and computes bias while waiting for HI (`scheduled_hilo`). The old
+  target kernel is still available as `target_hilo`.
+- Register-broadcast, four-quadword GRAY fill (`scheduled_span`), compared
+  with the old `target_span` and the deployed `memset` baseline.
+
+BGRA sweeps zero/one/opaque alpha, arbitrary bytes and premultiplied
+input, including per-call LUT setup. GRAY8 sweeps strengths 1..4, short
+and long rows, low coverage, saturated input and nonaligned rows.
+Packed conversion and gray fill also include short and nonaligned cases.
+Each CASE manifest declares the exact variants and repetitions. The five
+correctness trials exercise offsets 0,1,7,8,15 relative to each case's
+timed alignment. Warm screen rows exclude cold/alpha/alignment variants;
+the GRAY8 summary explicitly represents strength 4, not all strengths.
+All other decisions require full RB1 logs. The screen displays the build
+ID; build scripts append `-dirty` when sources differ from that commit.
+
+The SqrtFixed scalar baseline now uses the same builtin MSB selection as
+the default library, instead of the diagnostic bit scan. LCD_V references
+use signed negative-pitch indexing and do not advance past the final tap.
+GRAY fill CHECK names match their declared `scalar_loop` oracle. Rejected
+old logs retain suite names for BLOCKED diagnostics without accepting
+unmanifested measurements.
+
+The immediate per-suite correctness recheck changes the active offset.
+Timed alignment is now restored AFTER that recheck. Older versions left
+the last correctness offset selected and could time scalar packed
+conversion fallbacks while claiming an aligned workload. Remeasure old
+ratios with the new ELF before interpreting conversion crossover points.
+
+Instruction semantics and arithmetic checks (these do not measure EE
+timing or replace the real-hardware correctness gate):
+
+```sh
+python3 tests/test_mmi_schedules.py "$PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc"
+sh tests/run_retro_simd_models.sh
+python3 tests/retro_bench/test_verdict.py
+python3 tests/retro_bench/test_compare_glyph.py
+cc -O2 -std=c99 tests/retro_bench/test_alignment.c -o alignment-test
+./alignment-test
+```
+
+The MMI model reads actual preprocessed asm, checks register data flow,
+byte order and bounds, including branch delay slots. The BGRA model
+exhausts every luminance 0..65025 for every nonzero alpha.
+
+## Whole-library load/render/embolden benchmark
+
+`tests/retro_glyph_bench.c` links separately to scalar and option-enabled
+FreeType archives. It supports normal, mono, LCD, LCD_V and overlap at
+8,12,18,32,64,128 pixels, with horizontal embolden strength 0..4 and one
+pixel of vertical emboldening when strength is nonzero. Font loading and
+character lookup occur before timing. Every glyph's bitmap and metrics
+are hashed in an untimed correctness pass; six timed batches include
+glyph loading, rendering and optional emboldening, without hashing or I/O.
+
+Host example (repeat with an option-enabled archive and distinct output):
+
+```sh
+cc -O2 -std=c99 -Iinclude tests/retro_glyph_bench.c \
+  path/to/scalar/libfreetype.a -lm -o glyph-scalar
+./glyph-scalar font.ttf normal 4 4 > scalar.log
+python3 tests/retro_bench/compare_glyph.py scalar.log optimized.log
+```
+
+For PS2 use the `glyph-bench` target in `Makefile.ps2`, supplying the same
+ROOT/EE_CC/CRT_DIR/PS2SDK/BUILD_ID variables as the kernel target, a distinct
+OUT ELF path and `FT_ARCHIVE` pointing to the matching target archive.
+Supply `FT_LIBS` if that archive needs optional dependencies. The ELF
+takes the same font/mode/strength/reps arguments through the loader.
+
+The RG1 comparator rejects incomplete logs, mismatched workload metadata
+or different glyph fingerprints. Its ratios compare separate binaries
+and are descriptive, not RB1 paired-bootstrap production selections.
+Repeat actual target runs in alternating build order with the same font.
+Host measurements do not establish PS2 performance.

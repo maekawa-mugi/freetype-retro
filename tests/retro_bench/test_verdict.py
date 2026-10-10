@@ -26,6 +26,18 @@ def fixture(candidate_ticks=(80, 81, 79, 80, 82, 78),
     return "\n".join(output) + "\n"
 
 class VerdictTests(unittest.TestCase):
+    def test_grayfill_oracle_name_matches_manifest(self):
+        captured = fixture().replace("suite-64", "grayfill-64").replace(",scalar,", ",scalar_loop,")
+        _, _, invalid = self.load(captured)
+        self.assertFalse(invalid)
+
+    def test_grayfill_wrong_scalar_check_name_is_blocked(self):
+        captured = fixture().replace("suite-64", "grayfill-64").replace(",scalar,", ",scalar_loop,")
+        captured = captured.replace("CHECK,grayfill-64,scalar_loop,", "CHECK,grayfill-64,scalar,")
+        _, choices, invalid = self.load(captured)
+        self.assertTrue(invalid)
+        self.assertTrue(choices["grayfill-64"].startswith("BLOCKED"))
+
     def load(self, text):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sample.log"

@@ -65,67 +65,228 @@ enum { MSB,MULFIX,DIVFIX,MULDIV,MULDIV_NO,SQRT,LCD,LCD_V,LCD_V_NEG,BLEND,BLEND_C
        BGRA,BGRA_COLD,MONO,MONO_COLD,OVERLAP,GRAYFILL,ROW_OR,
        PACK_MONO,PACK_GRAY2,PACK_GRAY4,EMBOLDEN_GRAY8,
        EMBOLDEN_GRAY8_X2,EMBOLDEN_GRAY8_X3,EMBOLDEN_GRAY8_X4 };
-struct rb_case { const char* name; int kind; unsigned size; unsigned reps; };
+struct rb_case { const char* name; int kind; unsigned size; unsigned reps; unsigned offset; unsigned alpha_mode; };
 static const struct rb_case cases[] = {
-  {"msb-1024",MSB,1024,48},
-  {"mulfix-1024",MULFIX,1024,24},
-  {"divfix-1024",DIVFIX,1024,12},
-  {"muldiv-1024",MULDIV,1024,12},
-  {"muldiv-noround-1024",MULDIV_NO,1024,12},
-  {"sqrt-1024",SQRT,1024,8},
-  {"lcd-16",LCD,16,320},
-  {"lcd-256",LCD,256,160},
-  {"lcd-4096",LCD,4096,24},
-  {"lcdv-16",LCD_V,16,320},
-  {"lcdv-256",LCD_V,256,160},
-  {"lcdv-4096",LCD_V,4096,24},
-  {"lcdv-neg-256",LCD_V_NEG,256,160},
-  {"lcdv-neg-4096",LCD_V_NEG,4096,24},
-  {"blend-16",BLEND,16,200},
-  {"blend-512",BLEND,512,36},
-  {"blend-4096",BLEND,4096,10},
-  {"blend-cold-16",BLEND_COLD,16,120},
-  {"blend-cold-4096",BLEND_COLD,4096,10},
-  {"bgra-16",BGRA,16,500},
-  {"bgra-512",BGRA,512,120},
-  {"bgra-4096",BGRA,4096,16},
-  {"bgra-cold-16",BGRA_COLD,16,320},
-  {"bgra-cold-4096",BGRA_COLD,4096,16},
-  {"mono-16",MONO,16,320},
-  {"mono-512",MONO,512,80},
-  {"mono-4096",MONO,4096,12},
-  {"mono-cold-16",MONO_COLD,16,300},
-  {"mono-cold-4096",MONO_COLD,4096,12},
-  {"overlap-64",OVERLAP,64,256},
-  {"overlap-4096",OVERLAP,4096,32},
-  {"grayfill-16",GRAYFILL,16,300},
-  {"grayfill-512",GRAYFILL,512,120},
-  {"grayfill-4096",GRAYFILL,4096,16},
-  {"bitmap-or-16",ROW_OR,16,400},
-  {"bitmap-or-512",ROW_OR,512,100},
-  {"bitmap-or-4096",ROW_OR,4096,16},
+  {"msb-1024",MSB,1024,48,0,0},
+  {"mulfix-1024",MULFIX,1024,24,0,0},
+  {"divfix-1024",DIVFIX,1024,12,0,0},
+  {"muldiv-1024",MULDIV,1024,12,0,0},
+  {"muldiv-noround-1024",MULDIV_NO,1024,12,0,0},
+  {"sqrt-1024",SQRT,1024,8,0,0},
+  {"lcd-16",LCD,16,320,0,0},
+  {"lcd-256",LCD,256,160,0,0},
+  {"lcd-4096",LCD,4096,24,0,0},
+  {"lcdv-16",LCD_V,16,320,0,0},
+  {"lcdv-256",LCD_V,256,160,0,0},
+  {"lcdv-4096",LCD_V,4096,24,0,0},
+  {"lcdv-neg-256",LCD_V_NEG,256,160,0,0},
+  {"lcdv-neg-4096",LCD_V_NEG,4096,24,0,0},
+  {"blend-16",BLEND,16,200,0,0},
+  {"blend-512",BLEND,512,36,0,0},
+  {"blend-4096",BLEND,4096,10,0,0},
+  {"blend-cold-16",BLEND_COLD,16,120,0,0},
+  {"blend-cold-64",BLEND_COLD,64,120,0,0},
+  {"blend-cold-256",BLEND_COLD,256,60,0,0},
+  {"blend-cold-512",BLEND_COLD,512,36,0,0},
+  {"blend-cold-4096",BLEND_COLD,4096,10,0,0},
+  {"bgra-16",BGRA,16,512,0,0},
+  {"bgra-64",BGRA,64,128,0,0},
+  {"bgra-256",BGRA,256,32,0,0},
+  {"bgra-512",BGRA,512,16,0,0},
+  {"bgra-4096",BGRA,4096,8,0,0},
+  {"bgra-opaque-16",BGRA,16,512,0,1},
+  {"bgra-opaque-64",BGRA,64,128,0,1},
+  {"bgra-opaque-256",BGRA,256,32,0,1},
+  {"bgra-opaque-512",BGRA,512,16,0,1},
+  {"bgra-opaque-4096",BGRA,4096,8,0,1},
+  {"bgra-premul-16",BGRA,16,512,0,2},
+  {"bgra-premul-64",BGRA,64,128,0,2},
+  {"bgra-premul-256",BGRA,256,32,0,2},
+  {"bgra-premul-512",BGRA,512,16,0,2},
+  {"bgra-premul-4096",BGRA,4096,8,0,2},
+  {"bgra-alpha1-16",BGRA,16,512,0,3},
+  {"bgra-alpha1-64",BGRA,64,128,0,3},
+  {"bgra-alpha1-256",BGRA,256,32,0,3},
+  {"bgra-alpha1-512",BGRA,512,16,0,3},
+  {"bgra-alpha1-4096",BGRA,4096,8,0,3},
+  {"bgra-zero-16",BGRA,16,512,0,4},
+  {"bgra-zero-64",BGRA,64,128,0,4},
+  {"bgra-zero-256",BGRA,256,32,0,4},
+  {"bgra-zero-512",BGRA,512,16,0,4},
+  {"bgra-zero-4096",BGRA,4096,8,0,4},
+  {"bgra-cold-16",BGRA_COLD,16,512,0,0},
+  {"bgra-cold-64",BGRA_COLD,64,128,0,0},
+  {"bgra-cold-256",BGRA_COLD,256,32,0,0},
+  {"bgra-cold-512",BGRA_COLD,512,16,0,0},
+  {"bgra-cold-4096",BGRA_COLD,4096,8,0,0},
+  {"bgra-cold-opaque-16",BGRA_COLD,16,512,0,1},
+  {"bgra-cold-opaque-64",BGRA_COLD,64,128,0,1},
+  {"bgra-cold-opaque-256",BGRA_COLD,256,32,0,1},
+  {"bgra-cold-opaque-512",BGRA_COLD,512,16,0,1},
+  {"bgra-cold-opaque-4096",BGRA_COLD,4096,8,0,1},
+  {"bgra-cold-premul-16",BGRA_COLD,16,512,0,2},
+  {"bgra-cold-premul-64",BGRA_COLD,64,128,0,2},
+  {"bgra-cold-premul-256",BGRA_COLD,256,32,0,2},
+  {"bgra-cold-premul-512",BGRA_COLD,512,16,0,2},
+  {"bgra-cold-premul-4096",BGRA_COLD,4096,8,0,2},
+  {"bgra-cold-alpha1-16",BGRA_COLD,16,512,0,3},
+  {"bgra-cold-alpha1-64",BGRA_COLD,64,128,0,3},
+  {"bgra-cold-alpha1-256",BGRA_COLD,256,32,0,3},
+  {"bgra-cold-alpha1-512",BGRA_COLD,512,16,0,3},
+  {"bgra-cold-alpha1-4096",BGRA_COLD,4096,8,0,3},
+  {"bgra-cold-zero-16",BGRA_COLD,16,512,0,4},
+  {"bgra-cold-zero-64",BGRA_COLD,64,128,0,4},
+  {"bgra-cold-zero-256",BGRA_COLD,256,32,0,4},
+  {"bgra-cold-zero-512",BGRA_COLD,512,16,0,4},
+  {"bgra-cold-zero-4096",BGRA_COLD,4096,8,0,4},
+  {"mono-16",MONO,16,320,0,0},
+  {"mono-512",MONO,512,80,0,0},
+  {"mono-4096",MONO,4096,12,0,0},
+  {"mono-cold-16",MONO_COLD,16,300,0,0},
+  {"mono-cold-64",MONO_COLD,64,160,0,0},
+  {"mono-cold-256",MONO_COLD,256,80,0,0},
+  {"mono-cold-512",MONO_COLD,512,40,0,0},
+  {"mono-cold-4096",MONO_COLD,4096,12,0,0},
+  {"overlap-64",OVERLAP,64,256,0,0},
+  {"overlap-4096",OVERLAP,4096,32,0,0},
+  {"grayfill-8",GRAYFILL,8,300,0,0},
+  {"grayfill-16",GRAYFILL,16,300,0,0},
+  {"grayfill-31",GRAYFILL,31,300,0,0},
+  {"grayfill-32",GRAYFILL,32,300,0,0},
+  {"grayfill-63",GRAYFILL,63,300,0,0},
+  {"grayfill-64",GRAYFILL,64,300,0,0},
+  {"grayfill-128",GRAYFILL,128,300,0,0},
+  {"grayfill-512",GRAYFILL,512,120,0,0},
+  {"grayfill-4096",GRAYFILL,4096,16,0,0},
+  {"bitmap-or-16",ROW_OR,16,400,0,0},
+  {"bitmap-or-512",ROW_OR,512,100,0,0},
+  {"bitmap-or-4096",ROW_OR,4096,16,0,0},
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
-  {"pack-mono-64",PACK_MONO,64,220},
-  {"pack-mono-512",PACK_MONO,512,70},
-  {"pack-mono-4096",PACK_MONO,4096,12},
-  {"pack-gray2-64",PACK_GRAY2,64,220},
-  {"pack-gray2-512",PACK_GRAY2,512,70},
-  {"pack-gray2-4096",PACK_GRAY2,4096,12},
-  {"pack-gray4-64",PACK_GRAY4,64,220},
-  {"pack-gray4-512",PACK_GRAY4,512,70},
-  {"pack-gray4-4096",PACK_GRAY4,4096,12},
+  {"pack-mono-8",PACK_MONO,8,220,0,0},
+  {"pack-mono-16",PACK_MONO,16,220,0,0},
+  {"pack-mono-31",PACK_MONO,31,220,0,0},
+  {"pack-mono-32",PACK_MONO,32,220,0,0},
+  {"pack-mono-64",PACK_MONO,64,220,0,0},
+  {"pack-mono-128",PACK_MONO,128,220,0,0},
+  {"pack-mono-256",PACK_MONO,256,220,0,0},
+  {"pack-mono-512",PACK_MONO,512,70,0,0},
+  {"pack-mono-4096",PACK_MONO,4096,12,0,0},
+  {"pack-gray2-8",PACK_GRAY2,8,220,0,0},
+  {"pack-gray2-16",PACK_GRAY2,16,220,0,0},
+  {"pack-gray2-31",PACK_GRAY2,31,220,0,0},
+  {"pack-gray2-32",PACK_GRAY2,32,220,0,0},
+  {"pack-gray2-64",PACK_GRAY2,64,220,0,0},
+  {"pack-gray2-128",PACK_GRAY2,128,220,0,0},
+  {"pack-gray2-256",PACK_GRAY2,256,220,0,0},
+  {"pack-gray2-512",PACK_GRAY2,512,70,0,0},
+  {"pack-gray2-4096",PACK_GRAY2,4096,12,0,0},
+  {"pack-gray4-8",PACK_GRAY4,8,220,0,0},
+  {"pack-gray4-16",PACK_GRAY4,16,220,0,0},
+  {"pack-gray4-31",PACK_GRAY4,31,220,0,0},
+  {"pack-gray4-32",PACK_GRAY4,32,220,0,0},
+  {"pack-gray4-64",PACK_GRAY4,64,220,0,0},
+  {"pack-gray4-128",PACK_GRAY4,128,220,0,0},
+  {"pack-gray4-256",PACK_GRAY4,256,220,0,0},
+  {"pack-gray4-512",PACK_GRAY4,512,70,0,0},
+  {"pack-gray4-4096",PACK_GRAY4,4096,12,0,0},
 #endif
 #if defined(RETRO_BENCH_R5900)
-  {"embolden-gray8-64",EMBOLDEN_GRAY8,64,180},
-  {"embolden-gray8-512",EMBOLDEN_GRAY8,512,80},
-  {"embolden-gray8-4096",EMBOLDEN_GRAY8,4096,16},
-  {"embolden-gray8-x2-512",EMBOLDEN_GRAY8_X2,512,70},
-  {"embolden-gray8-x2-4096",EMBOLDEN_GRAY8_X2,4096,12},
-  {"embolden-gray8-x3-512",EMBOLDEN_GRAY8_X3,512,70},
-  {"embolden-gray8-x3-4096",EMBOLDEN_GRAY8_X3,4096,12},
-  {"embolden-gray8-x4-512",EMBOLDEN_GRAY8_X4,512,70},
-  {"embolden-gray8-x4-4096",EMBOLDEN_GRAY8_X4,4096,12},
+  {"embolden-gray8-8",EMBOLDEN_GRAY8,8,1024,0,0},
+  {"embolden-gray8-16",EMBOLDEN_GRAY8,16,512,0,0},
+  {"embolden-gray8-32",EMBOLDEN_GRAY8,32,256,0,0},
+  {"embolden-gray8-64",EMBOLDEN_GRAY8,64,128,0,0},
+  {"embolden-gray8-128",EMBOLDEN_GRAY8,128,64,0,0},
+  {"embolden-gray8-256",EMBOLDEN_GRAY8,256,32,0,0},
+  {"embolden-gray8-512",EMBOLDEN_GRAY8,512,16,0,0},
+  {"embolden-gray8-4096",EMBOLDEN_GRAY8,4096,12,0,0},
+  {"embolden-gray8-x2-8",EMBOLDEN_GRAY8_X2,8,1024,0,0},
+  {"embolden-gray8-x2-16",EMBOLDEN_GRAY8_X2,16,512,0,0},
+  {"embolden-gray8-x2-32",EMBOLDEN_GRAY8_X2,32,256,0,0},
+  {"embolden-gray8-x2-64",EMBOLDEN_GRAY8_X2,64,128,0,0},
+  {"embolden-gray8-x2-128",EMBOLDEN_GRAY8_X2,128,64,0,0},
+  {"embolden-gray8-x2-256",EMBOLDEN_GRAY8_X2,256,32,0,0},
+  {"embolden-gray8-x2-512",EMBOLDEN_GRAY8_X2,512,16,0,0},
+  {"embolden-gray8-x2-4096",EMBOLDEN_GRAY8_X2,4096,12,0,0},
+  {"embolden-gray8-x3-8",EMBOLDEN_GRAY8_X3,8,1024,0,0},
+  {"embolden-gray8-x3-16",EMBOLDEN_GRAY8_X3,16,512,0,0},
+  {"embolden-gray8-x3-32",EMBOLDEN_GRAY8_X3,32,256,0,0},
+  {"embolden-gray8-x3-64",EMBOLDEN_GRAY8_X3,64,128,0,0},
+  {"embolden-gray8-x3-128",EMBOLDEN_GRAY8_X3,128,64,0,0},
+  {"embolden-gray8-x3-256",EMBOLDEN_GRAY8_X3,256,32,0,0},
+  {"embolden-gray8-x3-512",EMBOLDEN_GRAY8_X3,512,16,0,0},
+  {"embolden-gray8-x3-4096",EMBOLDEN_GRAY8_X3,4096,12,0,0},
+  {"embolden-gray8-x4-8",EMBOLDEN_GRAY8_X4,8,1024,0,0},
+  {"embolden-gray8-x4-16",EMBOLDEN_GRAY8_X4,16,512,0,0},
+  {"embolden-gray8-x4-32",EMBOLDEN_GRAY8_X4,32,256,0,0},
+  {"embolden-gray8-x4-64",EMBOLDEN_GRAY8_X4,64,128,0,0},
+  {"embolden-gray8-x4-128",EMBOLDEN_GRAY8_X4,128,64,0,0},
+  {"embolden-gray8-x4-256",EMBOLDEN_GRAY8_X4,256,32,0,0},
+  {"embolden-gray8-x4-512",EMBOLDEN_GRAY8_X4,512,16,0,0},
+  {"embolden-gray8-x4-4096",EMBOLDEN_GRAY8_X4,4096,12,0,0},
+  {"embolden-gray8-unaligned1-256",EMBOLDEN_GRAY8,256,32,1,0},
+  {"embolden-gray8-unaligned7-256",EMBOLDEN_GRAY8,256,32,7,0},
+  {"embolden-gray8-unaligned15-256",EMBOLDEN_GRAY8,256,32,15,0},
+  {"embolden-gray8-x2-unaligned1-256",EMBOLDEN_GRAY8_X2,256,32,1,0},
+  {"embolden-gray8-x2-unaligned7-256",EMBOLDEN_GRAY8_X2,256,32,7,0},
+  {"embolden-gray8-x2-unaligned15-256",EMBOLDEN_GRAY8_X2,256,32,15,0},
+  {"embolden-gray8-x3-unaligned1-256",EMBOLDEN_GRAY8_X3,256,32,1,0},
+  {"embolden-gray8-x3-unaligned7-256",EMBOLDEN_GRAY8_X3,256,32,7,0},
+  {"embolden-gray8-x3-unaligned15-256",EMBOLDEN_GRAY8_X3,256,32,15,0},
+  {"embolden-gray8-x4-unaligned1-256",EMBOLDEN_GRAY8_X4,256,32,1,0},
+  {"embolden-gray8-x4-unaligned7-256",EMBOLDEN_GRAY8_X4,256,32,7,0},
+  {"embolden-gray8-x4-unaligned15-256",EMBOLDEN_GRAY8_X4,256,32,15,0},
 #endif
+  {"grayfill-unaligned1-16",GRAYFILL,16,120,1,0},
+  {"grayfill-unaligned1-64",GRAYFILL,64,120,1,0},
+  {"grayfill-unaligned1-512",GRAYFILL,512,120,1,0},
+  {"grayfill-unaligned1-4096",GRAYFILL,4096,120,1,0},
+  {"grayfill-unaligned7-16",GRAYFILL,16,120,7,0},
+  {"grayfill-unaligned7-64",GRAYFILL,64,120,7,0},
+  {"grayfill-unaligned7-512",GRAYFILL,512,120,7,0},
+  {"grayfill-unaligned7-4096",GRAYFILL,4096,120,7,0},
+  {"grayfill-unaligned15-16",GRAYFILL,16,120,15,0},
+  {"grayfill-unaligned15-64",GRAYFILL,64,120,15,0},
+  {"grayfill-unaligned15-512",GRAYFILL,512,120,15,0},
+  {"grayfill-unaligned15-4096",GRAYFILL,4096,120,15,0},
+#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+  {"pack-mono-unaligned1-512",PACK_MONO,512,70,1,0},
+  {"pack-mono-unaligned7-512",PACK_MONO,512,70,7,0},
+  {"pack-mono-unaligned15-512",PACK_MONO,512,70,15,0},
+  {"pack-gray2-unaligned1-512",PACK_GRAY2,512,70,1,0},
+  {"pack-gray2-unaligned7-512",PACK_GRAY2,512,70,7,0},
+  {"pack-gray2-unaligned15-512",PACK_GRAY2,512,70,15,0},
+  {"pack-gray4-unaligned1-512",PACK_GRAY4,512,70,1,0},
+  {"pack-gray4-unaligned7-512",PACK_GRAY4,512,70,7,0},
+  {"pack-gray4-unaligned15-512",PACK_GRAY4,512,70,15,0},
+#endif
+
+#if defined(RETRO_BENCH_R5900)
+  {"embolden-gray8-low-32",EMBOLDEN_GRAY8,32,32,0,1},
+  {"embolden-gray8-low-256",EMBOLDEN_GRAY8,256,32,0,1},
+  {"embolden-gray8-low-4096",EMBOLDEN_GRAY8,4096,32,0,1},
+  {"embolden-gray8-saturated-32",EMBOLDEN_GRAY8,32,32,0,2},
+  {"embolden-gray8-saturated-256",EMBOLDEN_GRAY8,256,32,0,2},
+  {"embolden-gray8-saturated-4096",EMBOLDEN_GRAY8,4096,32,0,2},
+  {"embolden-gray8-x2-low-32",EMBOLDEN_GRAY8_X2,32,32,0,1},
+  {"embolden-gray8-x2-low-256",EMBOLDEN_GRAY8_X2,256,32,0,1},
+  {"embolden-gray8-x2-low-4096",EMBOLDEN_GRAY8_X2,4096,32,0,1},
+  {"embolden-gray8-x2-saturated-32",EMBOLDEN_GRAY8_X2,32,32,0,2},
+  {"embolden-gray8-x2-saturated-256",EMBOLDEN_GRAY8_X2,256,32,0,2},
+  {"embolden-gray8-x2-saturated-4096",EMBOLDEN_GRAY8_X2,4096,32,0,2},
+  {"embolden-gray8-x3-low-32",EMBOLDEN_GRAY8_X3,32,32,0,1},
+  {"embolden-gray8-x3-low-256",EMBOLDEN_GRAY8_X3,256,32,0,1},
+  {"embolden-gray8-x3-low-4096",EMBOLDEN_GRAY8_X3,4096,32,0,1},
+  {"embolden-gray8-x3-saturated-32",EMBOLDEN_GRAY8_X3,32,32,0,2},
+  {"embolden-gray8-x3-saturated-256",EMBOLDEN_GRAY8_X3,256,32,0,2},
+  {"embolden-gray8-x3-saturated-4096",EMBOLDEN_GRAY8_X3,4096,32,0,2},
+  {"embolden-gray8-x4-low-32",EMBOLDEN_GRAY8_X4,32,32,0,1},
+  {"embolden-gray8-x4-low-256",EMBOLDEN_GRAY8_X4,256,32,0,1},
+  {"embolden-gray8-x4-low-4096",EMBOLDEN_GRAY8_X4,4096,32,0,1},
+  {"embolden-gray8-x4-saturated-32",EMBOLDEN_GRAY8_X4,32,32,0,2},
+  {"embolden-gray8-x4-saturated-256",EMBOLDEN_GRAY8_X4,256,32,0,2},
+  {"embolden-gray8-x4-saturated-4096",EMBOLDEN_GRAY8_X4,4096,32,0,2},
+#endif
+
 };
 static const unsigned nc=(unsigned)(sizeof(cases)/sizeof(cases[0]));
 
@@ -162,7 +323,7 @@ static const char* const rb_screen_names[RB_SCREEN_GROUPS]={
   "SqrtFixed", "LCD H", "LCD V", "BGRA Blend",
   "BGRA Gray", "MONO Emb", "Overlap", "GRAY Fill",
   "Bitmap OR", "Pack MONO", "Pack GRAY2",
-  "Pack GRAY4", "GRAY8 Emb"
+  "Pack GRAY4", "GRAY8 Emb x4"
 };
 
 /* All returns are literal group indices, never user data. */
@@ -245,7 +406,7 @@ static int rb_screen_hold(int status,const char* phase,const char* name)
   scr_setXY(0,23);
   scr_printf("Details: RB1 CHECK + SAMPLE records on stdout");
   scr_setXY(0,24);
-  scr_printf("COMPLETE | results retained on screen");
+  scr_printf("BUILD: %.36s",RETRO_BENCH_BUILD_ID);
   fflush(stdout);
   SleepThread();
   return status; /* unlikely to return */
@@ -263,7 +424,7 @@ static void rb_screen_record(const struct rb_case* t,
   /* This is the representative largest normal-size case. Cold LUT
    * timings are still fully recorded, but do not replace it here. */
   if(t->kind==BLEND_COLD || t->kind==BGRA_COLD ||
-     t->kind==MONO_COLD)return;
+     t->kind==MONO_COLD || t->offset || t->alpha_mode)return;
 
   if(t->kind==MSB && nvariants>1)base=1; /* FreeType builtin clz */
   if(t->kind==GRAYFILL && nvariants>1)base=1; /* libc memset */
@@ -327,7 +488,7 @@ static void rb_screen_results_page(void)
   scr_setfontcolor(RB_WHITE);
   scr_printf("Winners provisional; confirm with verdict.py");
   scr_setXY(0,24);
-  scr_printf("Full verdict: collect RB1 logs on PC");
+  scr_printf("BUILD: %.36s",RETRO_BENCH_BUILD_ID);
 }
 #else
 static void rb_screen_start(void) { }
@@ -389,12 +550,19 @@ static const char* label(int kind,unsigned v)
     if(v==0)return "scalar";if(v==1)return "hi_lo_words";
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
     if(v==2)return "target_hilo";
+#if defined(RETRO_BENCH_R5900)
+    if(v==3)return "scheduled_hilo";
+#endif
 #endif
     break;
   case DIVFIX: case MULDIV: case MULDIV_NO: case SQRT:
-  case BGRA: case BGRA_COLD: case MONO: case MONO_COLD:
+  case MONO: case MONO_COLD:
   case OVERLAP:
     if(v==0)return "scalar";if(v==1)return "option_c";
+    break;
+  case BGRA:case BGRA_COLD:
+    if(v==0)return "scalar";if(v==1)return "option_c";
+    if(v==2)return "reciprocal";
     break;
   case LCD:case LCD_V:case LCD_V_NEG:
     if(v==0)return "scalar";if(v==1)return "folded_c";
@@ -410,6 +578,9 @@ static const char* label(int kind,unsigned v)
     if(v==0)return "scalar_loop";if(v==1)return "memset";
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
     if(v==2)return "target_span";
+#if defined(RETRO_BENCH_R5900)
+    if(v==3)return "scheduled_span";
+#endif
 #endif
     break;
   case ROW_OR:
@@ -423,7 +594,9 @@ static const char* label(int kind,unsigned v)
   case EMBOLDEN_GRAY8_X3:case EMBOLDEN_GRAY8_X4:
     if(v==0)return "scalar";
 #if defined(RETRO_BENCH_R5900)
-    if(v==1)return "mmi";
+    if(v==1)return "mmi_legacy";
+    if(v==2)return "mmi";
+    if(v==3)return "mmi_direct";
 #elif defined(RETRO_BENCH_SPARC32)
     if(v==1)return "vis1";
 #endif
@@ -440,7 +613,9 @@ static unsigned variants(int kind)
     return 3;
 #endif
   if(kind==MULFIX)
-#if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
+#if defined(RETRO_BENCH_R5900)
+    return 4;
+#elif defined(RETRO_BENCH_SPARC32)
     return 3;
 #else
     return 2;
@@ -451,7 +626,12 @@ static unsigned variants(int kind)
 #else
     return 2;
 #endif
-  if(kind==BLEND||kind==BLEND_COLD)return 3;
+  if(kind==BLEND||kind==BLEND_COLD||kind==BGRA||kind==BGRA_COLD)return 3;
+#if defined(RETRO_BENCH_R5900)
+  if(kind==PACK_MONO||kind==PACK_GRAY2||kind==GRAYFILL)return 4;
+  if(kind==PACK_GRAY4||kind==EMBOLDEN_GRAY8||kind==EMBOLDEN_GRAY8_X2||
+     kind==EMBOLDEN_GRAY8_X3||kind==EMBOLDEN_GRAY8_X4)return 3;
+#endif
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
   if(kind==GRAYFILL||kind==ROW_OR)return 3;
 #endif
@@ -500,6 +680,20 @@ static void prepare(const struct rb_case* t,unsigned run_seed)
     input[i]=(FT_Byte)prng(&st);
     initial[i]=(FT_Byte)prng(&st);
   }
+  if(t->kind==BGRA || t->kind==BGRA_COLD){
+    for(i=0;i<t->size;i++){
+      FT_Byte* px=input+4*i;
+      if(t->alpha_mode==1)px[3]=255;
+      if(t->alpha_mode==3)px[3]=1;
+      if(t->alpha_mode==4)px[3]=0;
+      if(t->alpha_mode==2){
+        px[0]%=px[3]+1U;px[1]%=px[3]+1U;px[2]%=px[3]+1U;
+      }
+    }
+  }
+  if(t->kind>=EMBOLDEN_GRAY8 && t->alpha_mode){
+    for(i=0;i<RB_OUT_SIZE;i++)initial[i]=t->alpha_mode==1?(initial[i]&15U):255;
+  }
   /* All table setup is deliberately done OUTSIDE steady-state timing. */
   {
     FT_Color color={83,177,221,197};
@@ -517,7 +711,7 @@ static FT_UInt32 sqrt_original(FT_UInt32 v)
   FT_UInt32 q,t;
   if(!v)return 0;
   radicand=((uint64_t)v<<16)-1U;
-  q=1U<<((17U+rb_msb_scalar(v))>>1);
+  q=1U<<((17U+FT_MSB(v))>>1);
   do{t=q;q=(t+(FT_UInt32)(radicand/t)+1U)>>1;}while(q!=t);
   return q;
 }
@@ -538,7 +732,7 @@ static void lcd_v_original(FT_Byte* dst,unsigned width,unsigned char cover,
     unsigned delta=((unsigned)cover*weights[k]+85U)>>8;
     for(i=0;i<width;i++)
       dst[i]=(FT_Byte)(dst[i]+delta);
-    dst+=pitch;
+    if(k<4)dst+=pitch;
   }
 }
 static void blend_original(FT_Byte* dst,const FT_Byte* mask,unsigned width,
@@ -619,8 +813,13 @@ static void kernel(const struct rb_case* t,unsigned v)
       if(v==0)result[i]=rb_mulfix_scalar((FT_Int32)a[i],(FT_Int32)b[i]);
       else if(v==1)result[i]=rb_mulfix_words((FT_Int32)a[i],(FT_Int32)b[i]);
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
-      else result[i]=(FT_UInt32)ft_mulfix_retro_hw((FT_Int32)a[i],
-                                                    (FT_Int32)b[i]);
+      else result[i]=(FT_UInt32)
+#if defined(RETRO_BENCH_R5900)
+        (v==2?ft_mulfix_retro_hw_legacy((FT_Int32)a[i],(FT_Int32)b[i]):
+              ft_mulfix_retro_hw((FT_Int32)a[i],(FT_Int32)b[i]));
+#else
+        ft_mulfix_retro_hw((FT_Int32)a[i],(FT_Int32)b[i]);
+#endif
 #endif
     } break;
   case DIVFIX:
@@ -682,6 +881,7 @@ static void kernel(const struct rb_case* t,unsigned v)
     if(v && kind==BGRA_COLD)
       cold_gray_prepare(&gray_table);
     if(v==0)bgra_original(output+rb_offset,input,n);
+    else if(v==1)ft_bitmap_retro_bgra_gray_row_div(output+rb_offset,input,n,&gray_table);
     else ft_bitmap_retro_bgra_gray_row(output+rb_offset,input,n,&gray_table);
     break;
   case MONO:case MONO_COLD:
@@ -701,7 +901,12 @@ static void kernel(const struct rb_case* t,unsigned v)
     if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=179;
     else if(v==1)memset(output+rb_offset,179,n);
 #if defined(RETRO_BENCH_R5900) || defined(RETRO_BENCH_SPARC32)
-    else ft_gray_retro_fill(output+rb_offset,179,(int)n);
+    else
+#if defined(RETRO_BENCH_R5900)
+      if(v==2)ft_gray_retro_fill_legacy(output+rb_offset,179,(int)n);
+      else
+#endif
+      ft_gray_retro_fill(output+rb_offset,179,(int)n);
 #endif
     break;
   case ROW_OR:
@@ -716,7 +921,9 @@ static void kernel(const struct rb_case* t,unsigned v)
     if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
       (input[rb_offset+(i>>3)]>>(7-(i&7U)))&1U);
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_convert_mono_row(input+rb_offset,output+rb_offset,n);
+    else if(v==1)ft_bitmap_mmi_convert_mono_row_legacy(input+rb_offset,output+rb_offset,n);
+    else if(v==2)ft_bitmap_mmi_convert_mono_row(input+rb_offset,output+rb_offset,n);
+    else ft_bitmap_mmi_convert_mono_row_direct(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
     else ft_bitmap_vis1_convert_mono_row(input+rb_offset,output+rb_offset,n);
 #endif
@@ -725,7 +932,9 @@ static void kernel(const struct rb_case* t,unsigned v)
     if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
       (input[rb_offset+(i>>2)]>>(6-2*(i&3U)))&3U);
 #if defined(RETRO_BENCH_R5900)
-    else ft_bitmap_mmi_convert_gray2_row(input+rb_offset,output+rb_offset,n);
+    else if(v==1)ft_bitmap_mmi_convert_gray2_row_legacy(input+rb_offset,output+rb_offset,n);
+    else if(v==2)ft_bitmap_mmi_convert_gray2_row(input+rb_offset,output+rb_offset,n);
+    else ft_bitmap_mmi_convert_gray2_row_direct(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
     else ft_bitmap_vis1_convert_gray2_row(input+rb_offset,output+rb_offset,n);
 #endif
@@ -734,6 +943,7 @@ static void kernel(const struct rb_case* t,unsigned v)
     if(v==0)for(i=0;i<n;i++)output[rb_offset+i]=(FT_Byte)(
       (input[rb_offset+(i>>1)]>>(4-4*(i&1U)))&15U);
 #if defined(RETRO_BENCH_R5900)
+    else if(v==1)ft_bitmap_mmi_convert_gray4_row_legacy(input+rb_offset,output+rb_offset,n);
     else ft_bitmap_mmi_convert_gray4_row(input+rb_offset,output+rb_offset,n);
 #elif defined(RETRO_BENCH_SPARC32)
     else ft_bitmap_vis1_convert_gray4_row(input+rb_offset,output+rb_offset,n);
@@ -757,6 +967,8 @@ static void kernel(const struct rb_case* t,unsigned v)
         }
       }
 #if defined(RETRO_BENCH_R5900)
+      else if(v==1)ft_bitmap_mmi_gray8_embolden_small_legacy(output+rb_offset,(FT_Int)n,
+                                               (FT_Int)strength);
       else ft_bitmap_mmi_gray8_embolden_small(output+rb_offset,(FT_Int)n,
                                                (FT_Int)strength);
 #endif
@@ -783,18 +995,21 @@ static int run(const struct rb_case* t,unsigned v,unsigned reps)
 static int validate_case(const struct rb_case* t,int log_checks)
 {
   unsigned v,trial,n=variants(t->kind);
+  unsigned saved_offset=rb_offset;
   FT_Byte oracle[RB_OUT_SIZE];
   FT_UInt32 ref[RB_ITEMS];
   unsigned expected,got;
   for(trial=0;trial<5;trial++){
-    rb_offset=16U+trial;
+    { static const unsigned offsets[5]={0,1,7,8,15};
+      rb_offset=16U+((t->offset+offsets[trial])&15U); }
     prepare(t,UINT32_C(0x6f234c91)+(unsigned)trial*101U);
     if(!run(t,0,1))return 0;
     expected=digest(t);
     memcpy(oracle,output,sizeof(oracle));
     memcpy(ref,result,sizeof(ref));
     if(log_checks)
-      printf("RB1,CHECK,%s,scalar,PASS,%08lx\n",t->name,(unsigned long)expected);
+      printf("RB1,CHECK,%s,%s,PASS,%08lx\n",t->name,
+             label(t->kind,0),(unsigned long)expected);
     for(v=1;v<n;v++){
       prepare(t,UINT32_C(0x6f234c91)+(unsigned)trial*101U);
       if(!run(t,v,1))return 0;
@@ -811,6 +1026,7 @@ static int validate_case(const struct rb_case* t,int log_checks)
                label(t->kind,v),(unsigned long)got);
     }
   }
+  rb_offset=saved_offset;
   return 1;
 }
 int main(void)
@@ -871,6 +1087,11 @@ int main(void)
       fprintf(stderr,"RB1,FATAL,%s,pre-benchmark-correctness\n",t->name);
       return rb_screen_hold(1,"CHECK FAILED",t->name);
     }
+    /* Select the DECLARED timed alignment after checking all correctness
+     * offsets. Validation also preserves caller state as a regression
+     * safeguard against silently timing scalar conversion fallbacks.
+     */
+    rb_offset=16U+t->offset;
     /* AB/BA and ABC/BCA/CAB; stable input, rotated thermal/cache order */
     for(s=0;s<RB_SAMPLES;s++){
       uint32_t sample_digests[4]={0,0,0,0};

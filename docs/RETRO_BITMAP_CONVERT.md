@@ -37,6 +37,14 @@ The two lookup tables consume 3KiB of read-only data and may
 compete with other working data in the EE's small cache. Benchmark
 before deciding whether the table method is beneficial.
 
+The new bulk schedule handles 32 output pixels per iteration, grouping
+independent loads before dependent unpacking/merging. The original
+16-pixel kernels handle remaining chunks and scalar tails. The harness
+retains all old kernels as `mmi_legacy` and adds LUT-free MONO/GRAY2
+packed-word expansion as `mmi_direct`. These direct alternatives are
+experimental harness candidates; the opt-in library uses the two-block
+schedule with the existing tables. Alignment requirements are unchanged.
+
 ### SPARC VIS1
 
 * MONO: two packed 32-bit lookup words are interleaved into eight

@@ -44,8 +44,8 @@ static void
 ref_vertical(FT_Byte* dst, unsigned len, int pitch,
              FT_Byte coverage, const FT_Byte w[5])
 {
-  unsigned i;
-  for (i=0;i<len;++i) {
+  int i;
+  for (i=0;i<(int)len;++i) {
     dst[i          ] = (FT_Byte)(dst[i          ] + ((coverage*w[0]+85U)>>8));
     dst[i+pitch    ] = (FT_Byte)(dst[i+pitch    ] + ((coverage*w[1]+85U)>>8));
     dst[i+2*pitch  ] = (FT_Byte)(dst[i+2*pitch  ] + ((coverage*w[2]+85U)>>8));

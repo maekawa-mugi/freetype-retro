@@ -88,6 +88,17 @@ main(void)
 
   ft_bitmap_retro_bgra_gray_prepare(&table);
 
+  /* Exhaust the full luminance/alpha domain, including values from
+   * non-premultiplied input.  Every reciprocal correction is checked.
+   */
+  for (scheme=1;scheme<256;scheme++)
+    for (i=0;i<=65025;i++)
+      if (ft_bitmap_retro_gray_divide(i,scheme) != i/scheme)
+      {
+        fprintf(stderr,"FAIL reciprocal n=%u a=%u\n",i,scheme);
+        return 1;
+      }
+
   for(i=0;i<256;i++)
     for(scheme=0;scheme<5;scheme++)
     {

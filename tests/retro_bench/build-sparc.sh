@@ -4,7 +4,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 out=${1:-"$root/build-retro-bench/retro-bench-sparc32"}
 mkdir -p "$(dirname -- "$out")"
-build_id=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
+build_id=$(git -C "$root" describe --always --dirty 2>/dev/null || echo unknown)
 cc=${CC:-sparc-linux-gnu-gcc}
 arch_flags=${SPARC_ARCH_FLAGS:-"-m32 -mcpu=ultrasparc"}
 # Intentional splitting of user-configured compiler flags.

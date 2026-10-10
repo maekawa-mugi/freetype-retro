@@ -34,14 +34,21 @@ For every output pixel it computes
 
     l = (blue[B] + green[G] + red[R]) >> 16;
 
-and applies the unchanged alpha division and byte conversion.
+and applies an exact reciprocal alpha division and the original byte
+conversion. A 256-entry read-only table stores `ceil(65536/a)` for
+nonzero alpha. For `0 <= l <= 65025`, `(l * reciprocal[a]) >> 16`
+is at most one above `floor(l/a)`; subtracting `q*a > l` corrects it.
+The multiplication fits in 32 bits. Alpha 255 uses the exact constant
+division identity `(l + 1 + (l >> 8)) >> 8`; alpha zero still returns zero.
+The original division-based LUT row is retained for harness comparison.
 Shifting or rounding each lookup entry *before* the sum is
 intentionally forbidden, as it would change the original image.
 
 The maximum sum is
 `(4731 + 46868 + 13937) * 255 * 255`,
 which remains within unsigned 32-bit arithmetic. The lookup
-uses **3072 bytes of stack memory** and allocates no heap memory.
+uses **3072 bytes of stack memory**, plus **1024 bytes of read-only
+reciprocal constants**, and allocates no heap memory.
 There is no 64-bit or floating-point math, and no MMI/VIS1
 instruction dependency.
 
