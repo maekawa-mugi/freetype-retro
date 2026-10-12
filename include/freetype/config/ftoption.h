@@ -158,6 +158,135 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * Enable the PlayStation 2 Emotion Engine (R5900) MMI implementation of
+   * selected FT_Bitmap_Embolden loops.  This is an opt-in implementation:
+   * it requires a GCC-compatible toolchain with R5900 MMI assembly support.
+   * Other architectures must not enable it.  The option is ignored if
+   * FT_CONFIG_OPTION_NO_ASSEMBLER is defined.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN */
+
+  /**************************************************************************
+   *
+   * Refinement of FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN: whole-row masked
+   * quadword kernels with no scalar edge loops.  GRAY8 rows of up to 96
+   * bytes use them (longer rows keep the software-pipelined block loop),
+   * MONO strength 1..4 gets its own halfword-shift kernel, and the
+   * vertical row OR is unrolled to four quadwords per iteration.  Output
+   * is byte-identical to the original.  Whole aligned quadwords that
+   * overlap a row are read and written back; bytes outside the row keep
+   * their values.  Needs FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN_MQ */
+
+
+  /**************************************************************************
+   *
+   * Optionally use R5900 MMI 128-bit aligned stores for long gray spans
+   * in the smooth rasterizer.  Spans shorter than 64 bytes use existing
+   * scalar/memset processing; target-specific compilation is required.
+   */
+/* #define FT_CONFIG_OPTION_MMI_GRAY_SPANS */
+
+
+  /**************************************************************************
+   *
+   * Optional R5900 MMI packed MONO/GRAY2/GRAY4 to 8-bit conversion.
+   * Uses small lookup tables for MONO/GRAY2, and PEXTLB/PSRLH/PSLLH
+   * for aligned GRAY4 blocks.  PS2 R5900 and GCC-compatible assembler
+   * required.  The option is disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_CONVERT */
+
+  /**************************************************************************
+   *
+   * Refinement of FT_CONFIG_OPTION_MMI_BITMAP_CONVERT: table-free MONO
+   * expansion (interleave tree) and GRAY2 expansion (shift folding, 64
+   * pixels per load) for 16-byte aligned rows; other rows use the
+   * existing routines.  Output is byte-identical.  Needs
+   * FT_CONFIG_OPTION_MMI_BITMAP_CONVERT.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BITMAP_CONVERT_EXT */
+
+
+  /**************************************************************************
+   *
+   * Optional exact integer optimization of FT_Bitmap_Blend.  Replaces
+   * division by 255 in BGRA color composition with an equivalent shift
+   * and add expression, and skips zero-coverage pixels.  This is normal
+   * portable integer C and can be used on PS2 and other CPUs, even with
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.  Disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 */
+
+
+  /**************************************************************************
+   *
+   * Optional 256-entry coverage lookup table for FT_Bitmap_Blend.
+   * For masks of at least 2048 pixels, prepares 1280 bytes of premultiplied
+   * source colors and inverse alpha values once per blend call, to avoid
+   * repeated source-color multiplications per pixel.  Smaller bitmaps
+   * use the exact scalar path instead.  This option also enables the
+   * exact integer division-by-255 replacement above, without requiring
+   * FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 separately.
+   *
+   * On memory-constrained targets, enable this only after profiling.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BLEND_LUT */
+
+  /**************************************************************************
+   *
+   * R5900 MMI FT_Bitmap_Blend: four pixels per quadword with a 4 KiB
+   * per-call table, used for masks of at least 512 pixels (smaller masks
+   * keep the scalar path).  Exact, identical to the original output.
+   * Implies the exact integer division by 255 of
+   * FT_CONFIG_OPTION_RETRO_BLEND_EXACT255.  Requires an R5900 GCC
+   * toolchain; disabled by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BLEND */
+
+  /**************************************************************************
+   *
+   * Optional scalar exact five-tap LCD filtering.  Precompute five
+   * independently rounded contributions once per raster span, then
+   * accumulate the central uniform region as one wrapping byte addition.
+   * Works for R5900 and other CPUs.  Disabled by default.
+   * Requires FT_CONFIG_OPTION_SUBPIXEL_RENDERING to have any effect.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_LCD_SPANS */
+
+
+  /**************************************************************************
+   *
+   * R5900 MMI acceleration of the LCD filter accumulation: masked head/tail quadwords and a four-quadword interior
+   * loop, so short spans benefit as well.  Requires
+   * FT_CONFIG_OPTION_SUBPIXEL_RENDERING.  Quadwords overlapping a span
+   * are written back with unchanged bytes outside it.
+   */
+/* #define FT_CONFIG_OPTION_MMI_LCD_MASK_SPANS */
+
+  /**************************************************************************
+   *
+   * Optional scalar grouping for the 4x oversampled smooth overlap
+   * rasterizer.  Adjacent source subpixels from one FT_Span contribute
+   * to one output byte; combining up to four additions preserves the
+   * original sum - (sum >> 8) byte behavior, including rollover.
+   * This is portable integer code for the EE and disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS */
+
+  /**************************************************************************
+   *
+   * MMI refinement of the overlap span grouping: spans of 128+ pixels use
+   * sixteen-byte vector steps (saturating vs wrapping PADD to detect the
+   * per-sample carry), exactly reproducing the scalar corrections.
+   * Implies FT_CONFIG_OPTION_RETRO_OVERLAP_SPANS.  R5900 only.
+   */
+/* #define FT_CONFIG_OPTION_MMI_OVERLAP_SPANS */
+
+
+  /**************************************************************************
+   *
    * If this macro is defined, try to use an inlined 64-bit or assembler
    * version of the @FT_MulFix function, which is a 'hotspot' when loading
    * and hinting glyphs, and which should be executed as fast as possible.
@@ -166,6 +295,95 @@ FT_BEGIN_HEADER
    * you can disable this option.
    */
 #define FT_CONFIG_OPTION_INLINE_MULFIX
+
+  /**************************************************************************
+   *
+   * Optional PS2 Emotion Engine R5900 32-bit ABI FT_MulFix override.
+   * Uses the MMI PMULTW 64-bit product and exactly reproduces the
+   * original signed 16.16 rounding (including negative ties).
+   * Optimizes both the internal inlined calls and the exported API.
+   *
+   * GCC-compatible R5900 32-bit assembly is required.  Builds with
+   * a 64-bit FT_Long are deliberately rejected.  Disabled by default.
+   * FT_CONFIG_OPTION_NO_ASSEMBLER restores FreeType's original path.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MULFIX_R5900 */
+
+  /**************************************************************************
+   *
+   * Optional PS2 R5900 MMI PLZCW most-significant-bit finder.
+   * Interprets the low 32-bit PLZCW count for positive nonzero words;
+   * returns 31 for words with bit 31 set and handles zero explicitly.
+   * Overrides the internal FT_MSB GCC builtin only when enabled.
+   *
+   * Requires R5900 MMI assembler with a 32-bit int/long ABI.
+   * Disabled by default and by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MSB_R5900 */
+
+
+  /**************************************************************************
+   *
+   * Optional FT_SqrtFixed for PS2 EE R5900 (FT_INT64 builds): a
+   * single-precision FPU sqrt.s estimate followed by an exact integer
+   * fix-up, so the result is identical to the Babylonian original.  Other
+   * targets fall back to __builtin_sqrtf.  Disabled by default.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_SQRT_FPU */
+
+  /**************************************************************************
+   *
+   * Optional FT_DivFix / FT_MulDiv / FT_MulDiv_No_Round on FT_INT64
+   * builds with 32-bit FT_Long (PS2 EE): the 64-bit numerator is divided
+   * with 32-bit DIVU only -- one divide when it fits 32 bits, three for
+   * a divisor below 65536 and a Hacker's Delight divlu otherwise -- so
+   * libgcc's 64/64 software division is never reached for positive
+   * divisors.  Low 32 bits of the quotient are kept exactly like the
+   * original.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_DIVMUL_DIGITWISE */
+
+
+  /**************************************************************************
+   *
+   * Optional exact BGRA to GRAY conversion for large color bitmaps.
+   * Build 3 component-square lookup tables (3072 bytes on the stack)
+   * only for conversions of at least 4096 pixels.  This removes
+   * per-pixel weighted RGB square multiplications but preserves
+   * the original unsaturated sum, >>16 rounding and alpha division.
+   *
+   * Portable C.  The 4096-pixel threshold is a
+   * provisional heuristic until actual bitmap workloads are profiled.
+   * Disabled by default; unaffected by FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT */
+
+  /**************************************************************************
+   *
+   * R5900 MMI BGRA to GRAY conversion: sixteen pixels per iteration, the
+   * weighted sum of squares on PMULTH/PMADDH and an exact reciprocal
+   * division; no per-call tables.  Exact, identical to the original
+   * output.  Takes precedence over FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT.
+   * Requires an R5900 GCC toolchain; disabled by
+   * FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_MMI_BGRA_GRAY */
+
+
+  /**************************************************************************
+   *
+   * Optional exact lookup for large packed-MONO bitmap emboldening.
+   * For horizontal strength 2..8, precompute two 256-byte lookup
+   * tables that OR the original byte with the right-shifted bits
+   * and include the left-neighbour bits in their original order.
+   *
+   * The table is used only when the padded pitch times row count
+   * reaches 1024 bytes; otherwise the original per-byte algorithm
+   * stays active.  The lookup uses 512 stack bytes and no heap.
+   * It is portable C, disabled by default, and works regardless
+   * of FT_CONFIG_OPTION_NO_ASSEMBLER.
+   */
+/* #define FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT */
 
 
   /**************************************************************************

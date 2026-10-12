@@ -38,6 +38,15 @@
 #include <freetype/internal/ftdebug.h>
 #include <freetype/internal/ftobjs.h>
 
+#if defined( FT_CONFIG_OPTION_RETRO_SQRT_FPU ) && defined( FT_INT64 )
+#include "ftsqrt_fpu_retro.h"
+#endif
+
+#if defined( FT_CONFIG_OPTION_RETRO_DIVMUL_DIGITWISE ) && \
+    defined( FT_INT64 )
+#include "ftdivmul_r5900.h"
+#endif
+
   /* cancel inlining macro from internal/ftcalc.h */
 #ifdef FT_MulFix
 #  undef FT_MulFix
@@ -172,6 +181,15 @@
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
     FT_MOVE_SIGN( FT_UInt64, c_, c, s );
 
+#ifdef FT_CONFIG_OPTION_RETRO_DIVMUL_DIGITWISE
+    if ( c > 0 )
+    {
+      d_ = (FT_Long)ft_divmul_r5900_div64( a * b + ( c >> 1 ),
+                                           (FT_UInt32)c );
+      return s < 0 ? NEG_LONG( d_ ) : d_;
+    }
+#endif
+
     d = c > 0 ? ( a * b + ( c >> 1 ) ) / c
               : 0x7FFFFFFFUL;
 
@@ -197,6 +215,14 @@
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
     FT_MOVE_SIGN( FT_UInt64, c_, c, s );
 
+#ifdef FT_CONFIG_OPTION_RETRO_DIVMUL_DIGITWISE
+    if ( c > 0 )
+    {
+      d_ = (FT_Long)ft_divmul_r5900_div64( a * b, (FT_UInt32)c );
+      return s < 0 ? NEG_LONG( d_ ) : d_;
+    }
+#endif
+
     d = c > 0 ? a * b / c
               : 0x7FFFFFFFUL;
 
@@ -212,7 +238,13 @@
   FT_MulFix( FT_Long  a_,
              FT_Long  b_ )
   {
-#ifdef FT_CONFIG_OPTION_INLINE_MULFIX
+#ifdef FT_MULFIX_ASSEMBLER
+
+    /* Also accelerate public FT_MulFix, not only internal inline calls.
+     * The retro implementation shares the exact FreeType rounding rule. */
+    return FT_MULFIX_ASSEMBLER( (FT_Int32)a_, (FT_Int32)b_ );
+
+#elif defined( FT_CONFIG_OPTION_INLINE_MULFIX )
 
     return FT_MulFix_64( a_, b_ );
 
@@ -223,7 +255,7 @@
     /* this requires arithmetic right shift of signed numbers */
     return (FT_Long)( ( ab + 0x8000L + ( ab >> 63 ) ) >> 16 );
 
-#endif /* FT_CONFIG_OPTION_INLINE_MULFIX */
+#endif /* retro assembler or inline/default FT_MulFix */
   }
 
 
@@ -240,6 +272,15 @@
 
     FT_MOVE_SIGN( FT_UInt64, a_, a, s );
     FT_MOVE_SIGN( FT_UInt64, b_, b, s );
+
+#ifdef FT_CONFIG_OPTION_RETRO_DIVMUL_DIGITWISE
+    if ( b > 0 )
+    {
+      q_ = (FT_Long)ft_divmul_r5900_div64( ( a << 16 ) + ( b >> 1 ),
+                                           (FT_UInt32)b );
+      return s < 0 ? NEG_LONG( q_ ) : q_;
+    }
+#endif
 
     q = b > 0 ? ( ( a << 16 ) + ( b >> 1 ) ) / b
               : 0x7FFFFFFFUL;
@@ -879,6 +920,12 @@
     if ( v == 0 )
       return 0;
 
+#if defined( FT_CONFIG_OPTION_RETRO_SQRT_FPU ) && defined( FT_INT64 )
+
+    return ft_sqrt_fpu_retro( v );
+
+#else /* original FT_SqrtFixed algorithm */
+
 #ifndef FT_INT64
 
     /* Algorithm by Christophe Meessen (1993) with overflow fixed and     */
@@ -935,6 +982,8 @@
 
       return q;
     }
+
+#endif /* optional FPU FT_SqrtFixed */
   }
 
 

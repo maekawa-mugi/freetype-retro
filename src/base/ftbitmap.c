@@ -22,6 +22,56 @@
 #include <freetype/ftimage.h>
 #include <freetype/internal/ftobjs.h>
 
+#if defined( FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_ENABLED
+#include "ftbitmap_mmi.h"
+
+#ifdef FT_CONFIG_OPTION_MMI_BITMAP_EMBOLDEN_MQ
+#define FT_BITMAP_MMI_MQ_ENABLED
+#include "ftbitmap_mmi_ext.h"
+#endif
+#endif
+
+#if defined( FT_CONFIG_OPTION_MMI_BITMAP_CONVERT ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_CONVERT_ENABLED
+#include "ftbitmap_convert_mmi.h"
+
+#ifdef FT_CONFIG_OPTION_MMI_BITMAP_CONVERT_EXT
+#define FT_BITMAP_MMI_CONVERT_EXT_ENABLED
+#include "ftbitmap_convert_mmi_ext.h"
+#endif
+#endif
+
+#if defined( FT_CONFIG_OPTION_RETRO_BLEND_EXACT255 ) || \
+    defined( FT_CONFIG_OPTION_RETRO_BLEND_LUT )      || \
+    defined( FT_CONFIG_OPTION_MMI_BLEND )
+#define FT_BITMAP_RETRO_BLEND_ENABLED
+#include "ftbitmap_blend_retro.h"
+
+#if defined( FT_CONFIG_OPTION_MMI_BLEND ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_BLEND_ENABLED
+#include "ftbitmap_blend_mmi.h"
+#endif
+#endif
+
+#if defined( FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT ) || \
+    defined( FT_CONFIG_OPTION_MMI_BGRA_GRAY )
+#include "ftbitmap_bgra_gray_retro.h"
+
+#if defined( FT_CONFIG_OPTION_MMI_BGRA_GRAY ) && \
+    !defined( FT_CONFIG_OPTION_NO_ASSEMBLER )
+#define FT_BITMAP_MMI_BGRA_GRAY_ENABLED
+#include "ftbitmap_bgra_gray_mmi.h"
+#endif
+#endif
+
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+#include "ftbitmap_mono_embolden_retro.h"
+#endif
+
 
   /**************************************************************************
    *
@@ -291,6 +341,11 @@
     FT_UInt         y;
     FT_Int          xstr, ystr;
 
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+    FT_Retro_Mono_Embolden_Table  mono_table;
+    FT_Bool                       use_mono_table;
+#endif
+
 
     if ( !library )
       return FT_THROW( Invalid_Library_Handle );
@@ -362,6 +417,20 @@
       p = bitmap->buffer + (FT_UInt)pitch * ( bitmap->rows - 1 );
     }
 
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+    /* Build the 512-byte lookup only when enough interior bytes
+     * justify setup and the source really is packed MONO. */
+    use_mono_table = bitmap->pixel_mode == FT_PIXEL_MODE_MONO &&
+#ifdef FT_BITMAP_MMI_MQ_ENABLED
+                     xstr > 4 &&           /* 1..4 use the MMI kernel */
+#else
+                     xstr >= 2 &&
+#endif
+                     (FT_ULong)pitch * bitmap->rows >= 1024UL;
+    if ( use_mono_table )
+      ft_bitmap_retro_mono_embolden_prepare( &mono_table, (FT_UInt)xstr );
+#endif
+
     /* for each row */
     for ( y = 0; y < bitmap->rows; y++ )
     {
@@ -371,6 +440,31 @@
        * From the last pixel on, make each pixel or'ed with the
        * `xstr' pixels before it.
        */
+#ifdef FT_BITMAP_MMI_MQ_ENABLED
+      if ( bitmap->pixel_mode == FT_PIXEL_MODE_MONO &&
+           xstr >= 1 && xstr <= 4 )
+        ft_bitmap_mmi_mono_embolden_mq( p, pitch, xstr );
+      else
+#endif
+#ifdef FT_CONFIG_OPTION_RETRO_MONO_EMBOLDEN_LUT
+      if ( use_mono_table )
+        ft_bitmap_retro_mono_embolden_row( p, pitch, &mono_table );
+      else
+#endif
+#ifdef FT_BITMAP_MMI_ENABLED
+      /* Each 8-bit 256-level pixel is a saturated sum of the original
+       * xstr+1 coverage bytes.  The R5900 path handles 1..4 pixels, including
+       * LCD horizontal pixel tripling; others retain the scalar path. */
+      if ( bitmap->pixel_mode != FT_PIXEL_MODE_MONO &&
+           bitmap->num_grays == 256                &&
+           xstr >= 1 && xstr <= 4 )
+#ifdef FT_BITMAP_MMI_MQ_ENABLED
+        ft_bitmap_mmi_gray8_embolden_auto( p, pitch, xstr );
+#else
+        ft_bitmap_mmi_gray8_embolden_small( p, pitch, xstr );
+#endif
+      else
+#endif
       for ( x = pitch - 1; x >= 0; x-- )
       {
         unsigned char  tmp;
@@ -425,8 +519,14 @@
 
 
         q = p - bitmap->pitch * x;
+#if defined( FT_BITMAP_MMI_MQ_ENABLED )
+        ft_bitmap_mmi_or_row_unroll( q, p, pitch );
+#elif defined( FT_BITMAP_MMI_ENABLED )
+        ft_bitmap_mmi_or_row( q, p, pitch );
+#else
         for ( i = 0; i < pitch; i++ )
           q[i] |= p[i];
+#endif
       }
 
       p += bitmap->pitch;
@@ -572,7 +672,15 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#ifdef FT_BITMAP_MMI_CONVERT_ENABLED
+#ifdef FT_BITMAP_MMI_CONVERT_EXT_ENABLED
+          ft_bitmap_mmi_convert_mono_row_tree( ss, tt, source->width );
+#else
+          ft_bitmap_mmi_convert_mono_row( ss, tt, source->width );
+#endif
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -609,6 +717,7 @@
             }
           }
 
+#endif /* packed MONO or GRAY2 conversion */
           s += source->pitch;
           t += target->pitch;
         }
@@ -648,7 +757,15 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#ifdef FT_BITMAP_MMI_CONVERT_ENABLED
+#ifdef FT_BITMAP_MMI_CONVERT_EXT_ENABLED
+          ft_bitmap_mmi_convert_gray2_row_fold64( ss, tt, source->width );
+#else
+          ft_bitmap_mmi_convert_gray2_row( ss, tt, source->width );
+#endif
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -680,6 +797,7 @@
             }
           }
 
+#endif /* packed MONO or GRAY2 conversion */
           s += source->pitch;
           t += target->pitch;
         }
@@ -698,7 +816,11 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
-          FT_UInt   j;
+
+#if defined( FT_BITMAP_MMI_CONVERT_ENABLED )
+          ft_bitmap_mmi_convert_gray4_row( ss, tt, source->width );
+#else
+          FT_UInt  j;
 
 
           /* get the full bytes */
@@ -717,6 +839,7 @@
           if ( source->width & 1 )
             tt[0] = (FT_Byte)( ( ss[0] & 0xF0 ) >> 4 );
 
+#endif /* architecture-specific GRAY4 conversion */
           s += source->pitch;
           t += target->pitch;
         }
@@ -728,6 +851,16 @@
       {
         FT_UInt  i;
 
+#if defined( FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT ) && \
+    !defined( FT_BITMAP_MMI_BGRA_GRAY_ENABLED )
+        FT_Retro_BGRA_Gray_Table  table;
+        FT_Bool                   use_table =
+          (FT_ULong)source->width * source->rows >= 4096UL;
+
+
+        if ( use_table )
+          ft_bitmap_retro_bgra_gray_prepare( &table );
+#endif
 
         target->num_grays = 256;
 
@@ -735,9 +868,20 @@
         {
           FT_Byte*  ss = s;
           FT_Byte*  tt = t;
+#ifndef FT_BITMAP_MMI_BGRA_GRAY_ENABLED
           FT_UInt   j;
+#endif
 
 
+#if defined( FT_BITMAP_MMI_BGRA_GRAY_ENABLED )
+          ft_bitmap_mmi_bgra_gray_row( tt, ss, source->width );
+#else
+#ifdef FT_CONFIG_OPTION_RETRO_BGRA_GRAY_LUT
+          if ( use_table )
+            ft_bitmap_retro_bgra_gray_row( tt, ss, source->width,
+                                            &table );
+          else
+#endif
           for ( j = source->width; j > 0; j-- )
           {
             tt[0] = ft_gray_for_premultiplied_srgb_bgra( ss );
@@ -745,6 +889,7 @@
             ss += 4;
             tt += 1;
           }
+#endif
 
           s += source->pitch;
           t += target->pitch;
@@ -989,11 +1134,51 @@
       unsigned char*  limit_p =
         p + source->pitch * (int)source->rows;
 
+#ifdef FT_BITMAP_MMI_BLEND_ENABLED
+      FT_MMI_Blend_Table  mmi_table __attribute__(( aligned( 16 ) ));
+      FT_Bool             use_mmi;
+#endif
+#ifdef FT_CONFIG_OPTION_RETRO_BLEND_LUT
+      FT_Retro_Blend_LUT  lut;
+      FT_Bool             use_lut;
+#endif
+
+
+#ifdef FT_BITMAP_MMI_BLEND_ENABLED
+      /* The 256-entry table pays for itself from about 512 pixels on. */
+      use_mmi = color.alpha != 0 &&
+                (FT_ULong)source->width * source->rows >= 512UL;
+      if ( use_mmi )
+        ft_bitmap_mmi_blend_prepare( &mmi_table, color );
+#endif
+
+#ifdef FT_CONFIG_OPTION_RETRO_BLEND_LUT
+      /* Do not spend a 256-entry setup pass on small glyphs. */
+      use_lut = color.alpha != 0 &&
+                (FT_ULong)source->width * source->rows >= 2048UL;
+      if ( use_lut )
+        ft_bitmap_retro_blend_prepare( &lut, color );
+#endif
 
       while ( p < limit_p )
       {
-        unsigned char*  r       = p;
-        unsigned char*  s       = q;
+        unsigned char*  r = p;
+        unsigned char*  s = q;
+
+
+#ifdef FT_BITMAP_RETRO_BLEND_ENABLED
+#ifdef FT_BITMAP_MMI_BLEND_ENABLED
+        if ( use_mmi )
+          ft_bitmap_mmi_blend_row( s, r, source->width, &mmi_table );
+        else
+#endif
+#ifdef FT_CONFIG_OPTION_RETRO_BLEND_LUT
+        if ( use_lut )
+          ft_bitmap_retro_blend_row_lut( s, r, source->width, &lut );
+        else
+#endif
+          ft_bitmap_retro_blend_row( s, r, source->width, color );
+#else
         unsigned char*  limit_r = r + source->width;
 
 
@@ -1019,6 +1204,7 @@
           *s++ = (unsigned char)( br * ba2 / 255 + fr );
           *s++ = (unsigned char)( ba * ba2 / 255 + fa );
         }
+#endif /* FT_BITMAP_RETRO_BLEND_ENABLED */
 
         p += source->pitch;
         q += target->pitch;
